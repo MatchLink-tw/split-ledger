@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>分帳 & 備用金結算</title>
+<style>
+  :root{
+    --ink:#1C2541;
+    --ink-soft:#3A4166;
+    --paper:#FAF9F4;
+    --paper-line:#E4DFD1;
+    --teal:#2E7D8C;
+    --teal-soft:#DCEAEC;
+    --amber:#B5722A;
+    --amber-soft:#F3E4D2;
+    --good:#3B7A57;
+    --good-soft:#DCEEDF;
+    --mono: 'IBM Plex Mono','SFMono-Regular',Consolas,monospace;
+    --serif: 'Zilla Slab','Noto Serif TC',serif;
+    --sans: 'Inter','Noto Sans TC',-apple-system,BlinkMacSystemFont,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:920px;margin:0 auto;padding:0 20px 60px;}
+  header.top{
+    background:var(--ink);
+    color:var(--paper);
+    padding:28px 20px 22px;
+    margin-bottom:0;
+  }
+  header.top .inner{max-width:920px;margin:0 auto;}
+  header.top .eyebrow{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:#9AA6C4;
+    margin-bottom:6px;
+  }
+  header.top h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:28px;
+    margin:0;
+    letter-spacing:0.01em;
+  }
+  header.top p{
+    margin:8px 0 0;
+    font-size:13.5px;
+    color:#C4CBE0;
+    max-width:560px;
+    line-height:1.6;
+  }
+
+  nav.tabs{
+    display:flex;
+    gap:2px;
+    background:var(--ink);
+    padding:0 20px;
+  }
+  nav.tabs .inner{
+    max-width:920px;margin:0 auto;
+    display:flex;gap:4px;
+  }
+  nav.tabs button{
+    font-family:var(--sans);
+    font-size:13.5px;
+    font-weight:600;
+    background:transparent;
+    border:none;
+    color:#9AA6C4;
+    padding:12px 16px 14px;
+    cursor:pointer;
+    border-bottom:2px solid transparent;
+    transition:color .15s ease, border-color .15s ease;
+  }
+  nav.tabs button:hover{color:#E4E8F2;}
+  nav.tabs button.active{
+    color:var(--paper);
+    border-bottom:2px solid var(--teal);
+  }
+  .refresh-btn{
+    margin-left:auto;
+    font-family:var(--sans);
+    font-size:12.5px;
+    font-weight:600;
+    background:transparent;
+    border:none;
+    color:#9AA6C4;
+    padding:12px 4px 14px;
+    cursor:pointer;
+  }
+  .refresh-btn:hover{color:#E4E8F2;}
+
+  .loading-overlay{
+    position:fixed;inset:0;
+    background:var(--paper);
+    display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-size:13px;color:var(--ink-soft);
+    z-index:50;
+  }
+
+  main{padding-top:28px;}
+  section{display:none;}
+  section.active{display:block;}
+
+  h2.section-title{
+    font-family:var(--serif);
+    font-size:19px;
+    font-weight:600;
+    margin:0 0 4px;
+  }
+  p.section-sub{
+    font-size:13px;
+    color:var(--ink-soft);
+    margin:0 0 18px;
+    line-height:1.6;
+  }
+
+  .card{
+    background:#fff;
+    border:1px solid var(--paper-line);
+    border-radius:6px;
+    padding:18px 20px;
+    margin-bottom:16px;
+  }
+  .form-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    align-items:flex-end;
+    margin-bottom:14px;
+  }
+  .field{display:flex;flex-direction:column;gap:5px;flex:1;min-width:120px;}
+  .field label{
+    font-size:11px;
+    font-weight:600;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+  }
+  .field input, .field select{
+    font-family:var(--sans);
+    font-size:14px;
+    padding:8px 10px;
+    border:1px solid var(--paper-line);
+    border-radius:4px;
+    background:var(--paper);
+    color:var(--ink);
+  }
+  .field input:focus, .field select:focus{
+    outline:2px solid var(--teal);
+    outline-offset:1px;
+  }
+  button.primary{
+    font-family:var(--sans);
+    font-size:13.5px;
+    font-weight:700;
+    background:var(--teal);
+    color:#fff;
+    border:none;
+    border-radius:4px;
+    padding:9px 18px;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  button.primary:hover{background:#256670;}
+  button.primary:focus-visible{outline:2px solid var(--ink);outline-offset:2px;}
+
+  .participants{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-bottom:14px;
+  }
+  .chip{
+    display:flex;align-items:center;gap:6px;
+    border:1px solid var(--paper-line);
+    border-radius:20px;
+    padding:6px 12px 6px 8px;
+    font-size:13px;
+    cursor:pointer;
+    user-select:none;
+    background:var(--paper);
+  }
+  .chip input{margin:0;accent-color:var(--teal);}
+  .chip.checked{background:var(--teal-soft);border-color:var(--teal);}
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  thead th{
+    text-align:left;
+    font-size:11px;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    font-weight:700;
+    padding:8px 10px;
+    border-bottom:1px solid var(--ink);
+  }
+  tbody td{
+    padding:10px 10px;
+    border-bottom:1px solid var(--paper-line);
+    vertical-align:top;
+  }
+  tbody tr:last-child td{border-bottom:none;}
+  td.num, th.num{text-align:right;font-family:var(--mono);}
+  .del{
+    background:none;border:none;color:#B5472A;cursor:pointer;
+    font-size:12px;font-family:var(--sans);font-weight:600;padding:2px 4px;
+  }
+  .del:hover{text-decoration:underline;}
+  .empty{
+    color:var(--ink-soft);
+    font-size:13px;
+    padding:16px 4px;
+    text-align:center;
+  }
+  .tag{
+    display:inline-block;
+    font-family:var(--mono);
+    font-size:11.5px;
+    background:var(--teal-soft);
+    color:var(--teal);
+    padding:2px 7px;
+    border-radius:3px;
+    margin:2px 3px 2px 0;
+  }
+
+  /* Settlement */
+  .ledger{width:100%;border-collapse:collapse;}
+  .ledger thead th{border-bottom:2px solid var(--ink);}
+  .ledger td, .ledger th{padding:12px 10px;}
+  .ledger tbody tr{border-bottom:1px solid var(--paper-line);}
+  .ledger tfoot td{
+    border-top:2px solid var(--ink);
+    font-weight:700;
+    padding-top:14px;
+  }
+  .amt-pos{color:var(--good);font-weight:700;font-family:var(--mono);}
+  .amt-neg{color:var(--amber);font-weight:700;font-family:var(--mono);}
+  .amt-zero{color:var(--ink-soft);font-family:var(--mono);}
+  .badge{
+    font-family:var(--mono);
+    font-size:10.5px;
+    padding:2px 6px;
+    border-radius:3px;
+    margin-left:6px;
+  }
+  .badge.good{background:var(--good-soft);color:var(--good);}
+  .badge.amber{background:var(--amber-soft);color:var(--amber);}
+
+  .hint{
+    font-size:12px;
+    color:var(--ink-soft);
+    margin-top:2px;
+  }
+
+  @media (max-width:600px){
+    .form-row{flex-direction:column;align-items:stretch;}
+    .field{min-width:0;}
+  }
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">讀取雲端資料中…</div>
+
+<header class="top">
+  <div class="inner">
+    <div class="eyebrow">內部工具 · 費用結算</div>
+    <h1>分帳 &amp; 備用金結算</h1>
+    <p>只有實際「有使用」該筆費用的員工才會被分攤。備用金另外計算，會從每人最終結算金額中扣除。</p>
+    <div id="syncStatus" style="margin-top:12px;font-family:var(--mono);font-size:11.5px;color:#9AA6C4;">連線中…</div>
+  </div>
+</header>
+
+<nav class="tabs">
+  <div class="inner">
+    <button class="tab-btn active" data-tab="emp">員工</button>
+    <button class="tab-btn" data-tab="exp">費用登記</button>
+    <button class="tab-btn" data-tab="cash">備用金</button>
+    <button class="tab-btn" data-tab="sum">結算總表</button>
+    <button class="refresh-btn" id="refreshBtn" title="從雲端重新讀取最新資料">↻ 重新整理</button>
+  </div>
+</nav>
+
+<main class="wrap">
+
+  <!-- 員工 -->
+  <section id="emp" class="active">
+    <h2 class="section-title">員工名單</h2>
+    <p class="section-sub">先建立員工，才能在費用登記時勾選誰有使用。</p>
+    <div class="card">
+      <div class="form-row">
+        <div class="field" style="flex:2;">
+          <label for="empName">姓名</label>
+          <input id="empName" type="text" placeholder="例如：王小明">
+        </div>
+        <button class="primary" id="addEmpBtn">新增員工</button>
+      </div>
+      <table>
+        <thead><tr><th>姓名</th><th></th></tr></thead>
+        <tbody id="empTableBody"></tbody>
+      </table>
+      <div id="empEmpty" class="empty">尚未新增任何員工</div>
+    </div>
+  </section>
+
+  <!-- 費用登記 -->
+  <section id="exp">
+    <h2 class="section-title">費用登記</h2>
+    <p class="section-sub">輸入費用後，勾選「有使用到」的員工，系統會自動平均分攤給這些人。</p>
+    <div class="card">
+      <div class="form-row">
+        <div class="field" style="flex:2;">
+          <label for="expName">項目名稱</label>
+          <input id="expName" type="text" placeholder="例如：客戶餐敘">
+        </div>
+        <div class="field">
+          <label for="expAmount">金額</label>
+          <input id="expAmount" type="number" min="0" step="1" placeholder="0">
+        </div>
+        <div class="field">
+          <label for="expDate">日期</label>
+          <input id="expDate" type="date">
+        </div>
+      </div>
+      <label style="font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-soft);display:block;margin-bottom:8px;">誰有使用（勾選）</label>
+      <div class="participants" id="expParticipants"></div>
+      <button class="primary" id="addExpBtn">新增費用</button>
+    </div>
+
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th><th>日期</th><th>參與者</th>
+            <th class="num">總金額</th><th class="num">每人分攤</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="expTableBody"></tbody>
+      </table>
+      <div id="expEmpty" class="empty">尚未登記任何費用</div>
+    </div>
+  </section>
+
+  <!-- 備用金 -->
+  <section id="cash">
+    <h2 class="section-title">備用金紀錄</h2>
+    <p class="section-sub">員工已經領取的備用金，會在結算時從該員工的分攤金額中扣除。</p>
+    <div class="card">
+      <div class="form-row">
+        <div class="field" style="flex:1.4;">
+          <label for="cashEmp">員工</label>
+          <select id="cashEmp"></select>
+        </div>
+        <div class="field">
+          <label for="cashAmount">金額</label>
+          <input id="cashAmount" type="number" min="0" step="1" placeholder="0">
+        </div>
+        <div class="field">
+          <label for="cashDate">日期</label>
+          <input id="cashDate" type="date">
+        </div>
+        <div class="field" style="flex:1.6;">
+          <label for="cashNote">備註（選填）</label>
+          <input id="cashNote" type="text" placeholder="例如：出差備用金">
+        </div>
+      </div>
+      <button class="primary" id="addCashBtn">新增備用金紀錄</button>
+    </div>
+
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>員工</th><th>日期</th><th>備註</th><th class="num">金額</th><th></th></tr>
+        </thead>
+        <tbody id="cashTableBody"></tbody>
+      </table>
+      <div id="cashEmpty" class="empty">尚未登記任何備用金</div>
+    </div>
+  </section>
+
+  <!-- 結算總表 -->
+  <section id="sum">
+    <h2 class="section-title">結算總表</h2>
+    <p class="section-sub">淨結算 = 費用分攤總額 − 已領備用金。綠色表示公司應退款給員工；橘色表示員工已領超過分攤，需扣回或抵下期。</p>
+    <div class="card">
+      <table class="ledger">
+        <thead>
+          <tr>
+            <th>員工</th>
+            <th class="num">費用分攤</th>
+            <th class="num">備用金</th>
+            <th class="num">淨結算</th>
+          </tr>
+        </thead>
+        <tbody id="sumTableBody"></tbody>
+        <tfoot>
+          <tr>
+            <td>合計</td>
+            <td class="num" id="sumTotalExp">$0</td>
+            <td class="num" id="sumTotalCash">$0</td>
+            <td class="num" id="sumTotalNet">$0</td>
+          </tr>
+        </tfoot>
+      </table>
+      <div id="sumEmpty" class="empty">尚未有員工資料</div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+(function(){
+  let employees = [];   // {id, name}
+  let expenses = [];    // {id, name, amount, date, participantIds:[]}
+  let pettyCash = [];   // {id, empId, amount, date, note}
+  let nextId = 1;
+
+  const STORAGE_KEY = 'ledger-data-v1';
+  const fmt = n => '$' + Math.round(n).toLocaleString('zh-Hant-TW');
+
+  function setSyncStatus(text){
+    const el = document.getElementById('syncStatus');
+    if(el) el.textContent = text;
+  }
+
+  async function loadData(){
+    setSyncStatus('讀取雲端資料中…');
+    try{
+      const res = await window.storage.get(STORAGE_KEY, true);
+      if(res && res.value){
+        const d = JSON.parse(res.value);
+        employees = d.employees || [];
+        expenses = d.expenses || [];
+        pettyCash = d.pettyCash || [];
+        nextId = d.nextId || 1;
+      }
+      setSyncStatus('已同步 · ' + new Date().toLocaleTimeString('zh-Hant-TW'));
+    }catch(e){
+      // 尚未有任何雲端資料，視為全新開始
+      setSyncStatus('尚無雲端資料，將建立新的一份');
+    }
+    document.getElementById('loadingOverlay').style.display = 'none';
+    renderAll();
+  }
+
+  async function saveData(){
+    setSyncStatus('儲存中…');
+    try{
+      const ok = await window.storage.set(
+        STORAGE_KEY,
+        JSON.stringify({employees, expenses, pettyCash, nextId}),
+        true
+      );
+      if(!ok) throw new Error('empty result');
+      setSyncStatus('已同步 · ' + new Date().toLocaleTimeString('zh-Hant-TW'));
+    }catch(e){
+      setSyncStatus('⚠ 儲存失敗，請檢查網路後按「重新整理」');
+    }
+  }
+
+  document.getElementById('refreshBtn').addEventListener('click', loadData);
+
+  // ---------- Tabs ----------
+  document.querySelectorAll('.tab-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('main > section').forEach(s=>s.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ---------- Employees ----------
+  const empNameInput = document.getElementById('empName');
+  document.getElementById('addEmpBtn').addEventListener('click', addEmployee);
+  empNameInput.addEventListener('keydown', e=>{ if(e.key==='Enter') addEmployee(); });
+
+  function addEmployee(){
+    const name = empNameInput.value.trim();
+    if(!name) return;
+    employees.push({id: nextId++, name});
+    empNameInput.value='';
+    renderAll();
+    saveData();
+  }
+
+  function removeEmployee(id){
+    employees = employees.filter(e=>e.id!==id);
+    expenses.forEach(e=> e.participantIds = e.participantIds.filter(pid=>pid!==id));
+    pettyCash = pettyCash.filter(c=>c.empId!==id);
+    renderAll();
+    saveData();
+  }
+
+  // ---------- Expenses ----------
+  document.getElementById('addExpBtn').addEventListener('click', addExpense);
+
+  function addExpense(){
+    const name = document.getElementById('expName').value.trim();
+    const amount = parseFloat(document.getElementById('expAmount').value);
+    const date = document.getElementById('expDate').value;
+    const checked = Array.from(document.querySelectorAll('#expParticipants input:checked')).map(i=>parseInt(i.value));
+    if(!name || !amount || amount<=0){ alert('請輸入項目名稱與金額'); return; }
+    if(checked.length===0){ alert('請至少勾選一位有使用的員工'); return; }
+    expenses.push({id: nextId++, name, amount, date, participantIds: checked});
+    document.getElementById('expName').value='';
+    document.getElementById('expAmount').value='';
+    document.getElementById('expDate').value='';
+    renderAll();
+    saveData();
+  }
+
+  function removeExpense(id){
+    expenses = expenses.filter(e=>e.id!==id);
+    renderAll();
+    saveData();
+  }
+
+  // ---------- Petty cash ----------
+  document.getElementById('addCashBtn').addEventListener('click', addCash);
+
+  function addCash(){
+    const empId = parseInt(document.getElementById('cashEmp').value);
+    const amount = parseFloat(document.getElementById('cashAmount').value);
+    const date = document.getElementById('cashDate').value;
+    const note = document.getElementById('cashNote').value.trim();
+    if(!empId){ alert('請先新增員工'); return; }
+    if(!amount || amount<=0){ alert('請輸入金額'); return; }
+    pettyCash.push({id: nextId++, empId, amount, date, note});
+    document.getElementById('cashAmount').value='';
+    document.getElementById('cashDate').value='';
+    document.getElementById('cashNote').value='';
+    renderAll();
+    saveData();
+  }
+
+  function removeCash(id){
+    pettyCash = pettyCash.filter(c=>c.id!==id);
+    renderAll();
+    saveData();
+  }
+
+  // ---------- Render ----------
+  function renderAll(){
+    renderEmployees();
+    renderParticipantChips();
+    renderExpenses();
+    renderCashSelect();
+    renderCash();
+    renderSummary();
+  }
+
+  function renderEmployees(){
+    const body = document.getElementById('empTableBody');
+    const empty = document.getElementById('empEmpty');
+    body.innerHTML='';
+    empty.style.display = employees.length? 'none':'block';
+    employees.forEach(e=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${escapeHtml(e.name)}</td><td><button class="del" data-id="${e.id}">刪除</button></td>`;
+      tr.querySelector('.del').addEventListener('click', ()=>removeEmployee(e.id));
+      body.appendChild(tr);
+    });
+  }
+
+  function renderParticipantChips(){
+    const wrap = document.getElementById('expParticipants');
+    wrap.innerHTML='';
+    if(employees.length===0){
+      wrap.innerHTML = '<div class="hint">請先到「員工」頁籤新增員工</div>';
+      return;
+    }
+    employees.forEach(e=>{
+      const label = document.createElement('label');
+      label.className='chip';
+      label.innerHTML = `<input type="checkbox" value="${e.id}"><span>${escapeHtml(e.name)}</span>`;
+      const cb = label.querySelector('input');
+      cb.addEventListener('change', ()=> label.classList.toggle('checked', cb.checked));
+      wrap.appendChild(label);
+    });
+  }
+
+  function renderExpenses(){
+    const body = document.getElementById('expTableBody');
+    const empty = document.getElementById('expEmpty');
+    body.innerHTML='';
+    empty.style.display = expenses.length? 'none':'block';
+    expenses.forEach(ex=>{
+      const names = ex.participantIds.map(id=>{
+        const emp = employees.find(e=>e.id===id);
+        return emp? `<span class="tag">${escapeHtml(emp.name)}</span>` : '';
+      }).join('');
+      const per = ex.participantIds.length? ex.amount/ex.participantIds.length : 0;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${escapeHtml(ex.name)}</td>
+        <td>${ex.date||'—'}</td>
+        <td>${names||'—'}</td>
+        <td class="num">${fmt(ex.amount)}</td>
+        <td class="num">${fmt(per)}</td>
+        <td><button class="del" data-id="${ex.id}">刪除</button></td>`;
+      tr.querySelector('.del').addEventListener('click', ()=>removeExpense(ex.id));
+      body.appendChild(tr);
+    });
+  }
+
+  function renderCashSelect(){
+    const sel = document.getElementById('cashEmp');
+    const current = sel.value;
+    sel.innerHTML='';
+    if(employees.length===0){
+      sel.innerHTML='<option value="">請先新增員工</option>';
+      return;
+    }
+    employees.forEach(e=>{
+      const opt = document.createElement('option');
+      opt.value = e.id; opt.textContent = e.name;
+      sel.appendChild(opt);
+    });
+    if(current) sel.value = current;
+  }
+
+  function renderCash(){
+    const body = document.getElementById('cashTableBody');
+    const empty = document.getElementById('cashEmpty');
+    body.innerHTML='';
+    empty.style.display = pettyCash.length? 'none':'block';
+    pettyCash.forEach(c=>{
+      const emp = employees.find(e=>e.id===c.empId);
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${emp? escapeHtml(emp.name):'（已刪除）'}</td>
+        <td>${c.date||'—'}</td>
+        <td>${escapeHtml(c.note||'—')}</td>
+        <td class="num">${fmt(c.amount)}</td>
+        <td><button class="del" data-id="${c.id}">刪除</button></td>`;
+      tr.querySelector('.del').addEventListener('click', ()=>removeCash(c.id));
+      body.appendChild(tr);
+    });
+  }
+
+  function renderSummary(){
+    const body = document.getElementById('sumTableBody');
+    const empty = document.getElementById('sumEmpty');
+    body.innerHTML='';
+    empty.style.display = employees.length? 'none':'block';
+
+    let totalExp=0, totalCash=0, totalNet=0;
+
+    employees.forEach(e=>{
+      let expShare = 0;
+      expenses.forEach(ex=>{
+        if(ex.participantIds.includes(e.id) && ex.participantIds.length>0){
+          expShare += ex.amount / ex.participantIds.length;
+        }
+      });
+      let cashSum = 0;
+      pettyCash.forEach(c=>{ if(c.empId===e.id) cashSum += c.amount; });
+      const net = expShare - cashSum;
+
+      totalExp += expShare;
+      totalCash += cashSum;
+      totalNet += net;
+
+      let netClass = 'amt-zero';
+      let badge = '';
+      if(net > 0.005){ netClass='amt-pos'; badge='<span class="badge good">公司應退款</span>'; }
+      else if(net < -0.005){ netClass='amt-neg'; badge='<span class="badge amber">員工應退回</span>'; }
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${escapeHtml(e.name)}</td>
+        <td class="num">${fmt(expShare)}</td>
+        <td class="num">${fmt(cashSum)}</td>
+        <td class="num"><span class="${netClass}">${fmt(net)}</span>${badge}</td>`;
+      body.appendChild(tr);
+    });
+
+    document.getElementById('sumTotalExp').textContent = fmt(totalExp);
+    document.getElementById('sumTotalCash').textContent = fmt(totalCash);
+    document.getElementById('sumTotalNet').textContent = fmt(totalNet);
+  }
+
+  function escapeHtml(str){
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  loadData();
+})();
+</script>
+
+</body>
+</html>
