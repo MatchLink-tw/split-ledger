@@ -216,6 +216,11 @@
     font-size:12px;font-family:var(--sans);font-weight:600;padding:2px 4px;
   }
   .del:hover{text-decoration:underline;}
+  .edit{
+    background:none;border:none;color:#2c6e6f;cursor:pointer;
+    font-size:12px;font-family:var(--sans);font-weight:600;padding:2px 4px;
+  }
+  .edit:hover{text-decoration:underline;}
   .empty{
     color:var(--ink-soft);
     font-size:13px;
@@ -287,6 +292,7 @@
   <div class="inner">
     <button class="tab-btn active" data-tab="emp">員工</button>
     <button class="tab-btn" data-tab="exp">費用登記</button>
+    <button class="tab-btn" data-tab="dev">開發</button>
     <button class="tab-btn" data-tab="cash">備用金</button>
     <button class="tab-btn" data-tab="sum">結算總表</button>
     <button class="refresh-btn" id="refreshBtn" title="從雲端重新讀取最新資料">↻ 重新整理</button>
@@ -358,6 +364,7 @@
       </div>
       <div class="participants" id="expParticipants"></div>
       <button class="primary" id="addExpBtn">新增費用</button>
+      <button type="button" id="cancelExpEditBtn" style="display:none;margin-left:8px;border:1px solid var(--line,#ccc);background:none;padding:9px 16px;border-radius:6px;cursor:pointer;">取消編輯</button>
     </div>
 
     <div class="card">
@@ -365,12 +372,62 @@
         <thead>
           <tr>
             <th>項目</th><th>日期</th><th>參與者</th>
-            <th class="num">原幣金額</th><th class="num">折合馬幣</th><th class="num">每人分攤（馬幣）</th><th></th>
+            <th class="num">原幣金額</th><th class="num">折合馬幣</th><th class="num">每人分攤（馬幣）</th><th></th><th></th>
           </tr>
         </thead>
         <tbody id="expTableBody"></tbody>
       </table>
       <div id="expEmpty" class="empty">尚未登記任何費用</div>
+    </div>
+  </section>
+
+  <!-- 開發 -->
+  <section id="dev">
+    <h2 class="section-title">開發費用</h2>
+    <p class="section-sub">開發相關支出，勾選「有使用到」的員工，系統會自動平均分攤給這些人（與費用登記共用同一組匯率設定）。</p>
+
+    <div class="card">
+      <div class="form-row">
+        <div class="field" style="flex:2;">
+          <label for="devName">項目名稱</label>
+          <input id="devName" type="text" placeholder="例如：伺服器費用">
+        </div>
+        <div class="field">
+          <label for="devAmount">金額</label>
+          <input id="devAmount" type="number" min="0" step="1" placeholder="0">
+        </div>
+        <div class="field">
+          <label for="devCurrency">幣別</label>
+          <select id="devCurrency">
+            <option value="MYR">馬幣（MYR）</option>
+            <option value="USDT">USDT</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="devDate">日期</label>
+          <input id="devDate" type="date">
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <label style="font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-soft);">誰有使用（勾選）</label>
+        <button type="button" id="devSelectAllBtn" style="border:none;background:none;color:var(--accent, #2c6e6f);font-size:12px;font-weight:600;cursor:pointer;text-decoration:underline;padding:0;">全選 / 取消全選</button>
+      </div>
+      <div class="participants" id="devParticipants"></div>
+      <button class="primary" id="addDevBtn">新增開發費用</button>
+      <button type="button" id="cancelDevEditBtn" style="display:none;margin-left:8px;border:1px solid var(--line,#ccc);background:none;padding:9px 16px;border-radius:6px;cursor:pointer;">取消編輯</button>
+    </div>
+
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>項目</th><th>日期</th><th>參與者</th>
+            <th class="num">原幣金額</th><th class="num">折合馬幣</th><th class="num">每人分攤（馬幣）</th><th></th><th></th>
+          </tr>
+        </thead>
+        <tbody id="devTableBody"></tbody>
+      </table>
+      <div id="devEmpty" class="empty">尚未登記任何開發費用</div>
     </div>
   </section>
 
@@ -421,6 +478,7 @@
           <tr>
             <th>員工</th>
             <th class="num">費用分攤</th>
+            <th class="num">開發分攤</th>
             <th class="num">備用金</th>
             <th class="num">淨結算</th>
           </tr>
@@ -430,6 +488,7 @@
           <tr>
             <td>合計</td>
             <td class="num" id="sumTotalExp">$0</td>
+            <td class="num" id="sumTotalDev">$0</td>
             <td class="num" id="sumTotalCash">$0</td>
             <td class="num" id="sumTotalNet">$0</td>
           </tr>
@@ -445,9 +504,12 @@
 (function(){
   let employees = [];   // {id, name}
   let expenses = [];    // {id, name, amount, currency:'MYR'|'USDT', date, participantIds:[]}
+  let devExpenses = []; // 開發費用，結構同 expenses
   let pettyCash = [];   // {id, empId, amount, date, note}
   let nextId = 1;
   let usdtRate = 4.70;   // 1 USDT = ? MYR
+  let editingExpenseId = null;
+  let editingDevId = null;
 
   const fmt = n => '$' + Math.round(n).toLocaleString('zh-Hant-TW');
   const toMYR = ex => ex.currency==='USDT' ? ex.amount * usdtRate : ex.amount;
@@ -485,7 +547,7 @@
   async function saveData(){
     setSyncStatus('儲存中…');
     try{
-      await docRef.set({employees, expenses, pettyCash, nextId, usdtRate});
+      await docRef.set({employees, expenses, devExpenses, pettyCash, nextId, usdtRate});
       setSyncStatus('已同步 · ' + new Date().toLocaleTimeString('zh-Hant-TW'));
     }catch(e){
       console.error(e);
@@ -499,6 +561,7 @@
       const d = snap.data();
       employees = d.employees || [];
       expenses = d.expenses || [];
+      devExpenses = d.devExpenses || [];
       pettyCash = d.pettyCash || [];
       nextId = d.nextId || 1;
       usdtRate = (typeof d.usdtRate === 'number' && d.usdtRate>0) ? d.usdtRate : 4.70;
@@ -543,6 +606,7 @@
   function removeEmployee(id){
     employees = employees.filter(e=>e.id!==id);
     expenses.forEach(e=> e.participantIds = e.participantIds.filter(pid=>pid!==id));
+    devExpenses.forEach(e=> e.participantIds = e.participantIds.filter(pid=>pid!==id));
     pettyCash = pettyCash.filter(c=>c.empId!==id);
     renderAll();
     saveData();
@@ -571,7 +635,13 @@
     const checked = Array.from(document.querySelectorAll('#expParticipants input:checked')).map(i=>parseInt(i.value));
     if(!name || !amount || amount<=0){ alert('請輸入項目名稱與金額'); return; }
     if(checked.length===0){ alert('請至少勾選一位有使用的員工'); return; }
-    expenses.push({id: nextId++, name, amount, currency, date, participantIds: checked});
+    if(editingExpenseId!==null){
+      const idx = expenses.findIndex(e=>e.id===editingExpenseId);
+      if(idx>-1) expenses[idx] = {id: editingExpenseId, name, amount, currency, date, participantIds: checked};
+      cancelExpEdit();
+    } else {
+      expenses.push({id: nextId++, name, amount, currency, date, participantIds: checked});
+    }
     document.getElementById('expName').value='';
     document.getElementById('expAmount').value='';
     document.getElementById('expDate').value='';
@@ -579,8 +649,109 @@
     saveData();
   }
 
+  function startEditExpense(id){
+    const ex = expenses.find(e=>e.id===id);
+    if(!ex) return;
+    editingExpenseId = id;
+    document.getElementById('expName').value = ex.name;
+    document.getElementById('expAmount').value = ex.amount;
+    document.getElementById('expCurrency').value = ex.currency || 'MYR';
+    document.getElementById('expDate').value = ex.date || '';
+    renderParticipantChips('expParticipants');
+    document.querySelectorAll('#expParticipants input[type=checkbox]').forEach(cb=>{
+      if(ex.participantIds.includes(parseInt(cb.value))){
+        cb.checked = true;
+        cb.closest('.chip').classList.add('checked');
+      }
+    });
+    document.getElementById('addExpBtn').textContent = '更新費用';
+    document.getElementById('cancelExpEditBtn').style.display = 'inline-block';
+    document.getElementById('expName').scrollIntoView({behavior:'smooth', block:'center'});
+  }
+
+  function cancelExpEdit(){
+    editingExpenseId = null;
+    document.getElementById('addExpBtn').textContent = '新增費用';
+    document.getElementById('cancelExpEditBtn').style.display = 'none';
+    document.getElementById('expName').value='';
+    document.getElementById('expAmount').value='';
+    document.getElementById('expDate').value='';
+    renderParticipantChips('expParticipants');
+  }
+  document.getElementById('cancelExpEditBtn').addEventListener('click', cancelExpEdit);
+
   function removeExpense(id){
     expenses = expenses.filter(e=>e.id!==id);
+    if(editingExpenseId===id) cancelExpEdit();
+    renderAll();
+    saveData();
+  }
+
+  // ---------- 開發費用 ----------
+  document.getElementById('addDevBtn').addEventListener('click', addDevExpense);
+  document.getElementById('devSelectAllBtn').addEventListener('click', ()=>{
+    const boxes = Array.from(document.querySelectorAll('#devParticipants input[type=checkbox]'));
+    if(boxes.length===0) return;
+    const allChecked = boxes.every(b=>b.checked);
+    boxes.forEach(b=> b.checked = !allChecked);
+  });
+
+  function addDevExpense(){
+    const name = document.getElementById('devName').value.trim();
+    const amount = parseFloat(document.getElementById('devAmount').value);
+    const currency = document.getElementById('devCurrency').value;
+    const date = document.getElementById('devDate').value;
+    const checked = Array.from(document.querySelectorAll('#devParticipants input:checked')).map(i=>parseInt(i.value));
+    if(!name || !amount || amount<=0){ alert('請輸入項目名稱與金額'); return; }
+    if(checked.length===0){ alert('請至少勾選一位有使用的員工'); return; }
+    if(editingDevId!==null){
+      const idx = devExpenses.findIndex(e=>e.id===editingDevId);
+      if(idx>-1) devExpenses[idx] = {id: editingDevId, name, amount, currency, date, participantIds: checked};
+      cancelDevEdit();
+    } else {
+      devExpenses.push({id: nextId++, name, amount, currency, date, participantIds: checked});
+    }
+    document.getElementById('devName').value='';
+    document.getElementById('devAmount').value='';
+    document.getElementById('devDate').value='';
+    renderAll();
+    saveData();
+  }
+
+  function startEditDevExpense(id){
+    const ex = devExpenses.find(e=>e.id===id);
+    if(!ex) return;
+    editingDevId = id;
+    document.getElementById('devName').value = ex.name;
+    document.getElementById('devAmount').value = ex.amount;
+    document.getElementById('devCurrency').value = ex.currency || 'MYR';
+    document.getElementById('devDate').value = ex.date || '';
+    renderParticipantChips('devParticipants');
+    document.querySelectorAll('#devParticipants input[type=checkbox]').forEach(cb=>{
+      if(ex.participantIds.includes(parseInt(cb.value))){
+        cb.checked = true;
+        cb.closest('.chip').classList.add('checked');
+      }
+    });
+    document.getElementById('addDevBtn').textContent = '更新開發費用';
+    document.getElementById('cancelDevEditBtn').style.display = 'inline-block';
+    document.getElementById('devName').scrollIntoView({behavior:'smooth', block:'center'});
+  }
+
+  function cancelDevEdit(){
+    editingDevId = null;
+    document.getElementById('addDevBtn').textContent = '新增開發費用';
+    document.getElementById('cancelDevEditBtn').style.display = 'none';
+    document.getElementById('devName').value='';
+    document.getElementById('devAmount').value='';
+    document.getElementById('devDate').value='';
+    renderParticipantChips('devParticipants');
+  }
+  document.getElementById('cancelDevEditBtn').addEventListener('click', cancelDevEdit);
+
+  function removeDevExpense(id){
+    devExpenses = devExpenses.filter(e=>e.id!==id);
+    if(editingDevId===id) cancelDevEdit();
     renderAll();
     saveData();
   }
@@ -612,8 +783,10 @@
   // ---------- Render ----------
   function renderAll(){
     renderEmployees();
-    renderParticipantChips();
+    renderParticipantChips('expParticipants');
+    renderParticipantChips('devParticipants');
     renderExpenses();
+    renderDevExpenses();
     renderCashSelect();
     renderCash();
     renderSummary();
@@ -632,8 +805,8 @@
     });
   }
 
-  function renderParticipantChips(){
-    const wrap = document.getElementById('expParticipants');
+  function renderParticipantChips(containerId){
+    const wrap = document.getElementById(containerId);
     wrap.innerHTML='';
     if(employees.length===0){
       wrap.innerHTML = '<div class="hint">請先到「員工」頁籤新增員工</div>';
@@ -669,8 +842,38 @@
         <td class="num">${fmtOriginal(ex)}</td>
         <td class="num">${fmt(myrAmount)}</td>
         <td class="num">${fmt(per)}</td>
+        <td><button class="edit" data-id="${ex.id}">編輯</button></td>
         <td><button class="del" data-id="${ex.id}">刪除</button></td>`;
+      tr.querySelector('.edit').addEventListener('click', ()=>startEditExpense(ex.id));
       tr.querySelector('.del').addEventListener('click', ()=>removeExpense(ex.id));
+      body.appendChild(tr);
+    });
+  }
+
+  function renderDevExpenses(){
+    const body = document.getElementById('devTableBody');
+    const empty = document.getElementById('devEmpty');
+    body.innerHTML='';
+    empty.style.display = devExpenses.length? 'none':'block';
+    devExpenses.forEach(ex=>{
+      const names = ex.participantIds.map(id=>{
+        const emp = employees.find(e=>e.id===id);
+        return emp? `<span class="tag">${escapeHtml(emp.name)}</span>` : '';
+      }).join('');
+      const myrAmount = toMYR(ex);
+      const per = ex.participantIds.length? myrAmount/ex.participantIds.length : 0;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${escapeHtml(ex.name)}</td>
+        <td>${ex.date||'—'}</td>
+        <td>${names||'—'}</td>
+        <td class="num">${fmtOriginal(ex)}</td>
+        <td class="num">${fmt(myrAmount)}</td>
+        <td class="num">${fmt(per)}</td>
+        <td><button class="edit" data-id="${ex.id}">編輯</button></td>
+        <td><button class="del" data-id="${ex.id}">刪除</button></td>`;
+      tr.querySelector('.edit').addEventListener('click', ()=>startEditDevExpense(ex.id));
+      tr.querySelector('.del').addEventListener('click', ()=>removeDevExpense(ex.id));
       body.appendChild(tr);
     });
   }
@@ -716,7 +919,7 @@
     body.innerHTML='';
     empty.style.display = employees.length? 'none':'block';
 
-    let totalExp=0, totalCash=0, totalNet=0;
+    let totalExp=0, totalDev=0, totalCash=0, totalNet=0;
 
     employees.forEach(e=>{
       let expShare = 0;
@@ -725,11 +928,18 @@
           expShare += toMYR(ex) / ex.participantIds.length;
         }
       });
+      let devShare = 0;
+      devExpenses.forEach(ex=>{
+        if(ex.participantIds.includes(e.id) && ex.participantIds.length>0){
+          devShare += toMYR(ex) / ex.participantIds.length;
+        }
+      });
       let cashSum = 0;
       pettyCash.forEach(c=>{ if(c.empId===e.id) cashSum += c.amount; });
-      const net = expShare - cashSum;
+      const net = expShare + devShare - cashSum;
 
       totalExp += expShare;
+      totalDev += devShare;
       totalCash += cashSum;
       totalNet += net;
 
@@ -742,12 +952,14 @@
       tr.innerHTML = `
         <td>${escapeHtml(e.name)}</td>
         <td class="num">${fmt(expShare)}</td>
+        <td class="num">${fmt(devShare)}</td>
         <td class="num">${fmt(cashSum)}</td>
         <td class="num"><span class="${netClass}">${fmt(net)}</span>${badge}</td>`;
       body.appendChild(tr);
     });
 
     document.getElementById('sumTotalExp').textContent = fmt(totalExp);
+    document.getElementById('sumTotalDev').textContent = fmt(totalDev);
     document.getElementById('sumTotalCash').textContent = fmt(totalCash);
     document.getElementById('sumTotalNet').textContent = fmt(totalNet);
   }
