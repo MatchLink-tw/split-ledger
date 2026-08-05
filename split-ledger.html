@@ -319,6 +319,17 @@
   <section id="exp">
     <h2 class="section-title">費用登記</h2>
     <p class="section-sub">輸入費用後，勾選「有使用到」的員工，系統會自動平均分攤給這些人。</p>
+
+    <div class="card" style="padding:14px 20px;">
+      <div class="form-row" style="align-items:flex-end;">
+        <div class="field" style="flex:1;">
+          <label for="usdtRate">匯率設定：1 USDT = 多少馬幣</label>
+          <input id="usdtRate" type="number" min="0" step="0.01" placeholder="例如：4.70">
+        </div>
+        <p style="font-size:12px;color:var(--ink-soft);margin:0 0 8px;flex:2;">USDT 計價的費用會依此匯率自動換算成馬幣，用於結算加總。</p>
+      </div>
+    </div>
+
     <div class="card">
       <div class="form-row">
         <div class="field" style="flex:2;">
@@ -328,6 +339,13 @@
         <div class="field">
           <label for="expAmount">金額</label>
           <input id="expAmount" type="number" min="0" step="1" placeholder="0">
+        </div>
+        <div class="field">
+          <label for="expCurrency">幣別</label>
+          <select id="expCurrency">
+            <option value="MYR">馬幣（MYR）</option>
+            <option value="USDT">USDT</option>
+          </select>
         </div>
         <div class="field">
           <label for="expDate">日期</label>
@@ -344,7 +362,7 @@
         <thead>
           <tr>
             <th>項目</th><th>日期</th><th>參與者</th>
-            <th class="num">總金額</th><th class="num">每人分攤</th><th></th>
+            <th class="num">原幣金額</th><th class="num">折合馬幣</th><th class="num">每人分攤（馬幣）</th><th></th>
           </tr>
         </thead>
         <tbody id="expTableBody"></tbody>
@@ -423,11 +441,14 @@
 <script>
 (function(){
   let employees = [];   // {id, name}
-  let expenses = [];    // {id, name, amount, date, participantIds:[]}
+  let expenses = [];    // {id, name, amount, currency:'MYR'|'USDT', date, participantIds:[]}
   let pettyCash = [];   // {id, empId, amount, date, note}
   let nextId = 1;
+  let usdtRate = 4.70;   // 1 USDT = ? MYR
 
   const fmt = n => '$' + Math.round(n).toLocaleString('zh-Hant-TW');
+  const toMYR = ex => ex.currency==='USDT' ? ex.amount * usdtRate : ex.amount;
+  const fmtOriginal = ex => (ex.currency==='USDT'? 'USDT ' : '$') + ex.amount.toLocaleString('zh-Hant-TW');
 
   // ---------- Firebase 設定 ----------
   // 請把下面這 6 個值換成你自己 Firebase 專案的設定
@@ -461,7 +482,7 @@
   async function saveData(){
     setSyncStatus('儲存中…');
     try{
-      await docRef.set({employees, expenses, pettyCash, nextId});
+      await docRef.set({employees, expenses, pettyCash, nextId, usdtRate});
       setSyncStatus('已同步 · ' + new Date().toLocaleTimeString('zh-Hant-TW'));
     }catch(e){
       console.error(e);
@@ -477,7 +498,9 @@
       expenses = d.expenses || [];
       pettyCash = d.pettyCash || [];
       nextId = d.nextId || 1;
+      usdtRate = (typeof d.usdtRate === 'number' && d.usdtRate>0) ? d.usdtRate : 4.70;
     }
+    document.getElementById('usdtRate').value = usdtRate;
     document.getElementById('loadingOverlay').style.display = 'none';
     renderAll();
     setSyncStatus('已同步 · ' + new Date().toLocaleTimeString('zh-Hant-TW'));
@@ -524,15 +547,22 @@
 
   // ---------- Expenses ----------
   document.getElementById('addExpBtn').addEventListener('click', addExpense);
+  document.getElementById('usdtRate').addEventListener('change', ()=>{
+    const v = parseFloat(document.getElementById('usdtRate').value);
+    usdtRate = (v>0)? v : 4.70;
+    renderAll();
+    saveData();
+  });
 
   function addExpense(){
     const name = document.getElementById('expName').value.trim();
     const amount = parseFloat(document.getElementById('expAmount').value);
+    const currency = document.getElementById('expCurrency').value;
     const date = document.getElementById('expDate').value;
     const checked = Array.from(document.querySelectorAll('#expParticipants input:checked')).map(i=>parseInt(i.value));
     if(!name || !amount || amount<=0){ alert('請輸入項目名稱與金額'); return; }
     if(checked.length===0){ alert('請至少勾選一位有使用的員工'); return; }
-    expenses.push({id: nextId++, name, amount, date, participantIds: checked});
+    expenses.push({id: nextId++, name, amount, currency, date, participantIds: checked});
     document.getElementById('expName').value='';
     document.getElementById('expAmount').value='';
     document.getElementById('expDate').value='';
@@ -620,13 +650,15 @@
         const emp = employees.find(e=>e.id===id);
         return emp? `<span class="tag">${escapeHtml(emp.name)}</span>` : '';
       }).join('');
-      const per = ex.participantIds.length? ex.amount/ex.participantIds.length : 0;
+      const myrAmount = toMYR(ex);
+      const per = ex.participantIds.length? myrAmount/ex.participantIds.length : 0;
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${escapeHtml(ex.name)}</td>
         <td>${ex.date||'—'}</td>
         <td>${names||'—'}</td>
-        <td class="num">${fmt(ex.amount)}</td>
+        <td class="num">${fmtOriginal(ex)}</td>
+        <td class="num">${fmt(myrAmount)}</td>
         <td class="num">${fmt(per)}</td>
         <td><button class="del" data-id="${ex.id}">刪除</button></td>`;
       tr.querySelector('.del').addEventListener('click', ()=>removeExpense(ex.id));
@@ -681,7 +713,7 @@
       let expShare = 0;
       expenses.forEach(ex=>{
         if(ex.participantIds.includes(e.id) && ex.participantIds.length>0){
-          expShare += ex.amount / ex.participantIds.length;
+          expShare += toMYR(ex) / ex.participantIds.length;
         }
       });
       let cashSum = 0;
