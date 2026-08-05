@@ -352,7 +352,10 @@
           <input id="expDate" type="date">
         </div>
       </div>
-      <label style="font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-soft);display:block;margin-bottom:8px;">誰有使用（勾選）</label>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <label style="font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-soft);">誰有使用（勾選）</label>
+        <button type="button" id="selectAllBtn" style="border:none;background:none;color:var(--accent, #2c6e6f);font-size:12px;font-weight:600;cursor:pointer;text-decoration:underline;padding:0;">全選 / 取消全選</button>
+      </div>
       <div class="participants" id="expParticipants"></div>
       <button class="primary" id="addExpBtn">新增費用</button>
     </div>
@@ -547,6 +550,12 @@
 
   // ---------- Expenses ----------
   document.getElementById('addExpBtn').addEventListener('click', addExpense);
+  document.getElementById('selectAllBtn').addEventListener('click', ()=>{
+    const boxes = Array.from(document.querySelectorAll('#expParticipants input[type=checkbox]'));
+    if(boxes.length===0) return;
+    const allChecked = boxes.every(b=>b.checked);
+    boxes.forEach(b=> b.checked = !allChecked);
+  });
   document.getElementById('usdtRate').addEventListener('change', ()=>{
     const v = parseFloat(document.getElementById('usdtRate').value);
     usdtRate = (v>0)? v : 4.70;
