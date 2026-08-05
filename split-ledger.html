@@ -267,6 +267,8 @@
     .field{min-width:0;}
   }
 </style>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 </head>
 <body>
 
@@ -425,48 +427,66 @@
   let pettyCash = [];   // {id, empId, amount, date, note}
   let nextId = 1;
 
-  const STORAGE_KEY = 'ledger-data-v1';
   const fmt = n => '$' + Math.round(n).toLocaleString('zh-Hant-TW');
+
+  // ---------- Firebase 設定 ----------
+  // 請把下面這 6 個值換成你自己 Firebase 專案的設定
+  // (Firebase 主控台 → 專案設定 → 一般 → 你的應用程式 → SDK 設定與程式碼)
+  const firebaseConfig = {
+    apiKey: "AIzaSyA7xR6mk-FpBNtNI30g11AD9ByYaNa7Pm0",
+    authDomain: "split-ledger-c56c3.firebaseapp.com",
+    projectId: "split-ledger-c56c3",
+    storageBucket: "split-ledger-c56c3.firebasestorage.app",
+    messagingSenderId: "481019023418",
+    appId: "1:481019023418:web:8c82643c4ba3c520f42503"
+  };
+
+  const DOC_PATH = { collection: 'ledger', doc: 'main' }; // 所有人共用同一份文件
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  const docRef = db.collection(DOC_PATH.collection).doc(DOC_PATH.doc);
 
   function setSyncStatus(text){
     const el = document.getElementById('syncStatus');
     if(el) el.textContent = text;
   }
 
-  async function loadData(){
+  let firstLoadDone = false;
+
+  function loadData(){
     setSyncStatus('讀取雲端資料中…');
-    try{
-      const res = await window.storage.get(STORAGE_KEY, true);
-      if(res && res.value){
-        const d = JSON.parse(res.value);
-        employees = d.employees || [];
-        expenses = d.expenses || [];
-        pettyCash = d.pettyCash || [];
-        nextId = d.nextId || 1;
-      }
-      setSyncStatus('已同步 · ' + new Date().toLocaleTimeString('zh-Hant-TW'));
-    }catch(e){
-      // 尚未有任何雲端資料，視為全新開始
-      setSyncStatus('尚無雲端資料，將建立新的一份');
-    }
-    document.getElementById('loadingOverlay').style.display = 'none';
-    renderAll();
   }
 
   async function saveData(){
     setSyncStatus('儲存中…');
     try{
-      const ok = await window.storage.set(
-        STORAGE_KEY,
-        JSON.stringify({employees, expenses, pettyCash, nextId}),
-        true
-      );
-      if(!ok) throw new Error('empty result');
+      await docRef.set({employees, expenses, pettyCash, nextId});
       setSyncStatus('已同步 · ' + new Date().toLocaleTimeString('zh-Hant-TW'));
     }catch(e){
+      console.error(e);
       setSyncStatus('⚠ 儲存失敗，請檢查網路後按「重新整理」');
     }
   }
+
+  // 即時同步：首次載入 + 之後任何裝置修改資料都會自動收到更新並重新渲染
+  docRef.onSnapshot(snap=>{
+    if(snap.exists){
+      const d = snap.data();
+      employees = d.employees || [];
+      expenses = d.expenses || [];
+      pettyCash = d.pettyCash || [];
+      nextId = d.nextId || 1;
+    }
+    document.getElementById('loadingOverlay').style.display = 'none';
+    renderAll();
+    setSyncStatus('已同步 · ' + new Date().toLocaleTimeString('zh-Hant-TW'));
+    firstLoadDone = true;
+  }, err=>{
+    console.error(err);
+    document.getElementById('loadingOverlay').style.display = 'none';
+    setSyncStatus('⚠ 連線失敗，請檢查 Firebase 設定與網路');
+  });
 
   document.getElementById('refreshBtn').addEventListener('click', loadData);
 
