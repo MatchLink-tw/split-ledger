@@ -434,16 +434,23 @@
   <!-- 股東入帳 -->
   <section id="cash">
     <h2 class="section-title">股東入帳</h2>
-    <p class="section-sub">股東出資給公司的資金紀錄（公帳），與員工分攤、退款無關，僅單獨記錄公司收到多少錢。</p>
+    <p class="section-sub">股東出資給公司的資金，同樣視為一筆開銷，勾選「有使用/受惠到」的員工，系統會自動平均分攤給這些人並算入結算總表。</p>
     <div class="card">
       <div class="form-row">
         <div class="field" style="flex:1.4;">
-          <label for="cashName">股東姓名</label>
-          <input id="cashName" type="text" placeholder="例如：王大股">
+          <label for="cashName">股東姓名 / 項目</label>
+          <input id="cashName" type="text" placeholder="例如：王大股 - 增資">
         </div>
         <div class="field">
           <label for="cashAmount">金額</label>
           <input id="cashAmount" type="number" min="0" step="1" placeholder="0">
+        </div>
+        <div class="field">
+          <label for="cashCurrency">幣別</label>
+          <select id="cashCurrency">
+            <option value="MYR">馬幣（MYR）</option>
+            <option value="USDT">USDT</option>
+          </select>
         </div>
         <div class="field">
           <label for="cashDate">日期</label>
@@ -454,6 +461,11 @@
           <input id="cashNote" type="text" placeholder="例如：增資、週轉金">
         </div>
       </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <label style="font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-soft);">誰有使用/受惠（勾選）</label>
+        <button type="button" id="cashSelectAllBtn" style="border:none;background:none;color:var(--accent, #2c6e6f);font-size:12px;font-weight:600;cursor:pointer;text-decoration:underline;padding:0;">全選 / 取消全選</button>
+      </div>
+      <div class="participants" id="cashParticipants"></div>
       <button class="primary" id="addCashBtn">新增入帳紀錄</button>
       <button type="button" id="cancelCashEditBtn" style="display:none;margin-left:8px;border:1px solid var(--line,#ccc);background:none;padding:9px 16px;border-radius:6px;cursor:pointer;">取消編輯</button>
     </div>
@@ -461,14 +473,17 @@
     <div class="card">
       <table>
         <thead>
-          <tr><th>股東姓名</th><th>日期</th><th>備註</th><th class="num">金額</th><th></th><th></th></tr>
+          <tr>
+            <th>股東姓名 / 項目</th><th>日期</th><th>備註</th><th>參與者</th>
+            <th class="num">原幣金額</th><th class="num">折合馬幣</th><th class="num">每人分攤（馬幣）</th><th></th><th></th>
+          </tr>
         </thead>
         <tbody id="cashTableBody"></tbody>
         <tfoot>
           <tr>
-            <td colspan="3">合計</td>
+            <td colspan="5">合計</td>
             <td class="num" id="cashTotal">$0</td>
-            <td></td><td></td>
+            <td></td><td></td><td></td>
           </tr>
         </tfoot>
       </table>
@@ -479,7 +494,7 @@
   <!-- 結算總表 -->
   <section id="sum">
     <h2 class="section-title">結算總表</h2>
-    <p class="section-sub">淨結算 = 費用分攤 + 開發分攤，代表公司應退款給該員工的金額（皆已換算為馬幣）。股東入帳為另外的公司資金來源，不影響此表。</p>
+    <p class="section-sub">每人開銷 = 費用分攤 + 開發分攤 + 股東入帳分攤（皆已換算為馬幣），單純記錄每位員工名下的開銷總額。</p>
     <div class="card">
       <table class="ledger">
         <thead>
@@ -487,7 +502,8 @@
             <th>員工</th>
             <th class="num">費用分攤</th>
             <th class="num">開發分攤</th>
-            <th class="num">淨結算（公司應退款）</th>
+            <th class="num">股東入帳分攤</th>
+            <th class="num">每人開銷</th>
           </tr>
         </thead>
         <tbody id="sumTableBody"></tbody>
@@ -496,11 +512,23 @@
             <td>合計</td>
             <td class="num" id="sumTotalExp">$0</td>
             <td class="num" id="sumTotalDev">$0</td>
+            <td class="num" id="sumTotalCash">$0</td>
             <td class="num" id="sumTotalNet">$0</td>
           </tr>
         </tfoot>
       </table>
       <div id="sumEmpty" class="empty">尚未有員工資料</div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0 0 12px;font-size:14px;color:var(--ink-soft);">原幣統計（換算前，三個頁籤加總）</h3>
+      <table class="ledger">
+        <thead><tr><th>幣別</th><th class="num">原幣總額</th></tr></thead>
+        <tbody>
+          <tr><td>馬幣（MYR）</td><td class="num" id="sumRawMYR">$0</td></tr>
+          <tr><td>USDT</td><td class="num" id="sumRawUSDT">USDT 0</td></tr>
+        </tbody>
+      </table>
     </div>
   </section>
 
@@ -511,7 +539,7 @@
   let employees = [];   // {id, name}
   let expenses = [];    // {id, name, amount, currency:'MYR'|'USDT', date, participantIds:[]}
   let devExpenses = []; // 開發費用，結構同 expenses
-  let pettyCash = [];   // {id, empId, amount, date, note}
+  let pettyCash = [];   // 股東入帳，結構同 expenses：{id, name, amount, currency, date, participantIds}
   let nextId = 1;
   let usdtRate = 4.70;   // 1 USDT = ? MYR
   let editingExpenseId = null;
@@ -613,6 +641,7 @@
     employees = employees.filter(e=>e.id!==id);
     expenses.forEach(e=> e.participantIds = e.participantIds.filter(pid=>pid!==id));
     devExpenses.forEach(e=> e.participantIds = e.participantIds.filter(pid=>pid!==id));
+    pettyCash.forEach(e=> { if(e.participantIds) e.participantIds = e.participantIds.filter(pid=>pid!==id); });
     renderAll();
     saveData();
   }
@@ -763,21 +792,30 @@
 
   // ---------- 股東入帳 ----------
   document.getElementById('addCashBtn').addEventListener('click', addCash);
+  document.getElementById('cashSelectAllBtn').addEventListener('click', ()=>{
+    const boxes = Array.from(document.querySelectorAll('#cashParticipants input[type=checkbox]'));
+    if(boxes.length===0) return;
+    const allChecked = boxes.every(b=>b.checked);
+    boxes.forEach(b=> b.checked = !allChecked);
+  });
   let editingCashId = null;
 
   function addCash(){
     const name = document.getElementById('cashName').value.trim();
     const amount = parseFloat(document.getElementById('cashAmount').value);
+    const currency = document.getElementById('cashCurrency').value;
     const date = document.getElementById('cashDate').value;
     const note = document.getElementById('cashNote').value.trim();
-    if(!name){ alert('請輸入股東姓名'); return; }
+    const checked = Array.from(document.querySelectorAll('#cashParticipants input:checked')).map(i=>parseInt(i.value));
+    if(!name){ alert('請輸入股東姓名 / 項目'); return; }
     if(!amount || amount<=0){ alert('請輸入金額'); return; }
+    if(checked.length===0){ alert('請至少勾選一位有使用/受惠的員工'); return; }
     if(editingCashId!==null){
       const idx = pettyCash.findIndex(c=>c.id===editingCashId);
-      if(idx>-1) pettyCash[idx] = {id: editingCashId, name, amount, date, note};
+      if(idx>-1) pettyCash[idx] = {id: editingCashId, name, amount, currency, date, note, participantIds: checked};
       cancelCashEdit();
     } else {
-      pettyCash.push({id: nextId++, name, amount, date, note});
+      pettyCash.push({id: nextId++, name, amount, currency, date, note, participantIds: checked});
     }
     document.getElementById('cashName').value='';
     document.getElementById('cashAmount').value='';
@@ -793,8 +831,16 @@
     editingCashId = id;
     document.getElementById('cashName').value = c.name;
     document.getElementById('cashAmount').value = c.amount;
+    document.getElementById('cashCurrency').value = c.currency || 'MYR';
     document.getElementById('cashDate').value = c.date || '';
     document.getElementById('cashNote').value = c.note || '';
+    renderParticipantChips('cashParticipants');
+    document.querySelectorAll('#cashParticipants input[type=checkbox]').forEach(cb=>{
+      if((c.participantIds||[]).includes(parseInt(cb.value))){
+        cb.checked = true;
+        cb.closest('.chip').classList.add('checked');
+      }
+    });
     document.getElementById('addCashBtn').textContent = '更新入帳紀錄';
     document.getElementById('cancelCashEditBtn').style.display = 'inline-block';
     document.getElementById('cashName').scrollIntoView({behavior:'smooth', block:'center'});
@@ -808,6 +854,7 @@
     document.getElementById('cashAmount').value='';
     document.getElementById('cashDate').value='';
     document.getElementById('cashNote').value='';
+    renderParticipantChips('cashParticipants');
   }
   document.getElementById('cancelCashEditBtn').addEventListener('click', cancelCashEdit);
 
@@ -823,6 +870,7 @@
     renderEmployees();
     renderParticipantChips('expParticipants');
     renderParticipantChips('devParticipants');
+    renderParticipantChips('cashParticipants');
     renderExpenses();
     renderDevExpenses();
     renderCash();
@@ -922,13 +970,22 @@
     empty.style.display = pettyCash.length? 'none':'block';
     let total = 0;
     pettyCash.forEach(c=>{
-      total += c.amount;
+      const names = (c.participantIds||[]).map(id=>{
+        const emp = employees.find(e=>e.id===id);
+        return emp? `<span class="tag">${escapeHtml(emp.name)}</span>` : '';
+      }).join('');
+      const myrAmount = toMYR(c);
+      const per = (c.participantIds && c.participantIds.length)? myrAmount/c.participantIds.length : 0;
+      total += myrAmount;
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${escapeHtml(c.name||'—')}</td>
         <td>${c.date||'—'}</td>
         <td>${escapeHtml(c.note||'—')}</td>
-        <td class="num">${fmt(c.amount)}</td>
+        <td>${names||'—'}</td>
+        <td class="num">${fmtOriginal(c)}</td>
+        <td class="num">${fmt(myrAmount)}</td>
+        <td class="num">${fmt(per)}</td>
         <td><button class="edit" data-id="${c.id}">編輯</button></td>
         <td><button class="del" data-id="${c.id}">刪除</button></td>`;
       tr.querySelector('.edit').addEventListener('click', ()=>startEditCash(c.id));
@@ -959,28 +1016,42 @@
           devShare += toMYR(ex) / ex.participantIds.length;
         }
       });
-      const net = expShare + devShare;
+      let cashShare = 0;
+      pettyCash.forEach(ex=>{
+        if(ex.participantIds && ex.participantIds.includes(e.id) && ex.participantIds.length>0){
+          cashShare += toMYR(ex) / ex.participantIds.length;
+        }
+      });
+      const net = expShare + devShare + cashShare;
 
       totalExp += expShare;
       totalDev += devShare;
+      totalCash += cashShare;
       totalNet += net;
-
-      let netClass = 'amt-zero';
-      let badge = '';
-      if(net > 0.005){ netClass='amt-pos'; badge='<span class="badge good">公司應退款</span>'; }
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${escapeHtml(e.name)}</td>
         <td class="num">${fmt(expShare)}</td>
         <td class="num">${fmt(devShare)}</td>
-        <td class="num"><span class="${netClass}">${fmt(net)}</span>${badge}</td>`;
+        <td class="num">${fmt(cashShare)}</td>
+        <td class="num">${fmt(net)}</td>`;
       body.appendChild(tr);
     });
 
     document.getElementById('sumTotalExp').textContent = fmt(totalExp);
     document.getElementById('sumTotalDev').textContent = fmt(totalDev);
+    document.getElementById('sumTotalCash').textContent = fmt(totalCash);
     document.getElementById('sumTotalNet').textContent = fmt(totalNet);
+
+    // 原幣統計（換算前，三個頁籤加總）
+    let rawMYR = 0, rawUSDT = 0;
+    [...expenses, ...devExpenses, ...pettyCash].forEach(ex=>{
+      if(ex.currency==='USDT') rawUSDT += ex.amount;
+      else rawMYR += ex.amount;
+    });
+    document.getElementById('sumRawMYR').textContent = fmt(rawMYR);
+    document.getElementById('sumRawUSDT').textContent = 'USDT ' + Math.round(rawUSDT).toLocaleString('zh-Hant-TW');
   }
 
   function escapeHtml(str){
