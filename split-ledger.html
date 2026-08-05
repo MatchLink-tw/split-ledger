@@ -283,7 +283,7 @@
   <div class="inner">
     <div class="eyebrow">內部工具 · 費用結算</div>
     <h1>分帳 &amp; 備用金結算</h1>
-    <p>只有實際「有使用」該筆費用的員工才會被分攤。備用金另外計算，會從每人最終結算金額中扣除。</p>
+    <p>只有實際「有使用」該筆費用的員工才會被分攤。股東入帳為公司資金來源，與員工分攤無關。</p>
     <div id="syncStatus" style="margin-top:12px;font-family:var(--mono);font-size:11.5px;color:#9AA6C4;">連線中…</div>
   </div>
 </header>
@@ -293,7 +293,7 @@
     <button class="tab-btn active" data-tab="emp">員工</button>
     <button class="tab-btn" data-tab="exp">費用登記</button>
     <button class="tab-btn" data-tab="dev">開發</button>
-    <button class="tab-btn" data-tab="cash">備用金</button>
+    <button class="tab-btn" data-tab="cash">股東入帳</button>
     <button class="tab-btn" data-tab="sum">結算總表</button>
     <button class="refresh-btn" id="refreshBtn" title="從雲端重新讀取最新資料">↻ 重新整理</button>
   </div>
@@ -431,15 +431,15 @@
     </div>
   </section>
 
-  <!-- 備用金 -->
+  <!-- 股東入帳 -->
   <section id="cash">
-    <h2 class="section-title">備用金紀錄</h2>
-    <p class="section-sub">員工已經領取的備用金，會在結算時從該員工的分攤金額中扣除。</p>
+    <h2 class="section-title">股東入帳</h2>
+    <p class="section-sub">股東出資給公司的資金紀錄（公帳），與員工分攤、退款無關，僅單獨記錄公司收到多少錢。</p>
     <div class="card">
       <div class="form-row">
         <div class="field" style="flex:1.4;">
-          <label for="cashEmp">員工</label>
-          <select id="cashEmp"></select>
+          <label for="cashName">股東姓名</label>
+          <input id="cashName" type="text" placeholder="例如：王大股">
         </div>
         <div class="field">
           <label for="cashAmount">金額</label>
@@ -451,27 +451,35 @@
         </div>
         <div class="field" style="flex:1.6;">
           <label for="cashNote">備註（選填）</label>
-          <input id="cashNote" type="text" placeholder="例如：出差備用金">
+          <input id="cashNote" type="text" placeholder="例如：增資、週轉金">
         </div>
       </div>
-      <button class="primary" id="addCashBtn">新增備用金紀錄</button>
+      <button class="primary" id="addCashBtn">新增入帳紀錄</button>
+      <button type="button" id="cancelCashEditBtn" style="display:none;margin-left:8px;border:1px solid var(--line,#ccc);background:none;padding:9px 16px;border-radius:6px;cursor:pointer;">取消編輯</button>
     </div>
 
     <div class="card">
       <table>
         <thead>
-          <tr><th>員工</th><th>日期</th><th>備註</th><th class="num">金額</th><th></th></tr>
+          <tr><th>股東姓名</th><th>日期</th><th>備註</th><th class="num">金額</th><th></th><th></th></tr>
         </thead>
         <tbody id="cashTableBody"></tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3">合計</td>
+            <td class="num" id="cashTotal">$0</td>
+            <td></td><td></td>
+          </tr>
+        </tfoot>
       </table>
-      <div id="cashEmpty" class="empty">尚未登記任何備用金</div>
+      <div id="cashEmpty" class="empty">尚未登記任何股東入帳</div>
     </div>
   </section>
 
   <!-- 結算總表 -->
   <section id="sum">
     <h2 class="section-title">結算總表</h2>
-    <p class="section-sub">淨結算 = 費用分攤總額 − 已領備用金。綠色表示公司應退款給員工；橘色表示員工已領超過分攤，需扣回或抵下期。</p>
+    <p class="section-sub">淨結算 = 費用分攤 + 開發分攤，代表公司應退款給該員工的金額（皆已換算為馬幣）。股東入帳為另外的公司資金來源，不影響此表。</p>
     <div class="card">
       <table class="ledger">
         <thead>
@@ -479,8 +487,7 @@
             <th>員工</th>
             <th class="num">費用分攤</th>
             <th class="num">開發分攤</th>
-            <th class="num">備用金</th>
-            <th class="num">淨結算</th>
+            <th class="num">淨結算（公司應退款）</th>
           </tr>
         </thead>
         <tbody id="sumTableBody"></tbody>
@@ -489,7 +496,6 @@
             <td>合計</td>
             <td class="num" id="sumTotalExp">$0</td>
             <td class="num" id="sumTotalDev">$0</td>
-            <td class="num" id="sumTotalCash">$0</td>
             <td class="num" id="sumTotalNet">$0</td>
           </tr>
         </tfoot>
@@ -607,7 +613,6 @@
     employees = employees.filter(e=>e.id!==id);
     expenses.forEach(e=> e.participantIds = e.participantIds.filter(pid=>pid!==id));
     devExpenses.forEach(e=> e.participantIds = e.participantIds.filter(pid=>pid!==id));
-    pettyCash = pettyCash.filter(c=>c.empId!==id);
     renderAll();
     saveData();
   }
@@ -756,17 +761,25 @@
     saveData();
   }
 
-  // ---------- Petty cash ----------
+  // ---------- 股東入帳 ----------
   document.getElementById('addCashBtn').addEventListener('click', addCash);
+  let editingCashId = null;
 
   function addCash(){
-    const empId = parseInt(document.getElementById('cashEmp').value);
+    const name = document.getElementById('cashName').value.trim();
     const amount = parseFloat(document.getElementById('cashAmount').value);
     const date = document.getElementById('cashDate').value;
     const note = document.getElementById('cashNote').value.trim();
-    if(!empId){ alert('請先新增員工'); return; }
+    if(!name){ alert('請輸入股東姓名'); return; }
     if(!amount || amount<=0){ alert('請輸入金額'); return; }
-    pettyCash.push({id: nextId++, empId, amount, date, note});
+    if(editingCashId!==null){
+      const idx = pettyCash.findIndex(c=>c.id===editingCashId);
+      if(idx>-1) pettyCash[idx] = {id: editingCashId, name, amount, date, note};
+      cancelCashEdit();
+    } else {
+      pettyCash.push({id: nextId++, name, amount, date, note});
+    }
+    document.getElementById('cashName').value='';
     document.getElementById('cashAmount').value='';
     document.getElementById('cashDate').value='';
     document.getElementById('cashNote').value='';
@@ -774,8 +787,33 @@
     saveData();
   }
 
+  function startEditCash(id){
+    const c = pettyCash.find(c=>c.id===id);
+    if(!c) return;
+    editingCashId = id;
+    document.getElementById('cashName').value = c.name;
+    document.getElementById('cashAmount').value = c.amount;
+    document.getElementById('cashDate').value = c.date || '';
+    document.getElementById('cashNote').value = c.note || '';
+    document.getElementById('addCashBtn').textContent = '更新入帳紀錄';
+    document.getElementById('cancelCashEditBtn').style.display = 'inline-block';
+    document.getElementById('cashName').scrollIntoView({behavior:'smooth', block:'center'});
+  }
+
+  function cancelCashEdit(){
+    editingCashId = null;
+    document.getElementById('addCashBtn').textContent = '新增入帳紀錄';
+    document.getElementById('cancelCashEditBtn').style.display = 'none';
+    document.getElementById('cashName').value='';
+    document.getElementById('cashAmount').value='';
+    document.getElementById('cashDate').value='';
+    document.getElementById('cashNote').value='';
+  }
+  document.getElementById('cancelCashEditBtn').addEventListener('click', cancelCashEdit);
+
   function removeCash(id){
     pettyCash = pettyCash.filter(c=>c.id!==id);
+    if(editingCashId===id) cancelCashEdit();
     renderAll();
     saveData();
   }
@@ -787,7 +825,6 @@
     renderParticipantChips('devParticipants');
     renderExpenses();
     renderDevExpenses();
-    renderCashSelect();
     renderCash();
     renderSummary();
   }
@@ -878,39 +915,27 @@
     });
   }
 
-  function renderCashSelect(){
-    const sel = document.getElementById('cashEmp');
-    const current = sel.value;
-    sel.innerHTML='';
-    if(employees.length===0){
-      sel.innerHTML='<option value="">請先新增員工</option>';
-      return;
-    }
-    employees.forEach(e=>{
-      const opt = document.createElement('option');
-      opt.value = e.id; opt.textContent = e.name;
-      sel.appendChild(opt);
-    });
-    if(current) sel.value = current;
-  }
-
   function renderCash(){
     const body = document.getElementById('cashTableBody');
     const empty = document.getElementById('cashEmpty');
     body.innerHTML='';
     empty.style.display = pettyCash.length? 'none':'block';
+    let total = 0;
     pettyCash.forEach(c=>{
-      const emp = employees.find(e=>e.id===c.empId);
+      total += c.amount;
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td>${emp? escapeHtml(emp.name):'（已刪除）'}</td>
+        <td>${escapeHtml(c.name||'—')}</td>
         <td>${c.date||'—'}</td>
         <td>${escapeHtml(c.note||'—')}</td>
         <td class="num">${fmt(c.amount)}</td>
+        <td><button class="edit" data-id="${c.id}">編輯</button></td>
         <td><button class="del" data-id="${c.id}">刪除</button></td>`;
+      tr.querySelector('.edit').addEventListener('click', ()=>startEditCash(c.id));
       tr.querySelector('.del').addEventListener('click', ()=>removeCash(c.id));
       body.appendChild(tr);
     });
+    document.getElementById('cashTotal').textContent = fmt(total);
   }
 
   function renderSummary(){
@@ -934,33 +959,27 @@
           devShare += toMYR(ex) / ex.participantIds.length;
         }
       });
-      let cashSum = 0;
-      pettyCash.forEach(c=>{ if(c.empId===e.id) cashSum += c.amount; });
-      const net = expShare + devShare - cashSum;
+      const net = expShare + devShare;
 
       totalExp += expShare;
       totalDev += devShare;
-      totalCash += cashSum;
       totalNet += net;
 
       let netClass = 'amt-zero';
       let badge = '';
       if(net > 0.005){ netClass='amt-pos'; badge='<span class="badge good">公司應退款</span>'; }
-      else if(net < -0.005){ netClass='amt-neg'; badge='<span class="badge amber">員工應退回</span>'; }
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${escapeHtml(e.name)}</td>
         <td class="num">${fmt(expShare)}</td>
         <td class="num">${fmt(devShare)}</td>
-        <td class="num">${fmt(cashSum)}</td>
         <td class="num"><span class="${netClass}">${fmt(net)}</span>${badge}</td>`;
       body.appendChild(tr);
     });
 
     document.getElementById('sumTotalExp').textContent = fmt(totalExp);
     document.getElementById('sumTotalDev').textContent = fmt(totalDev);
-    document.getElementById('sumTotalCash').textContent = fmt(totalCash);
     document.getElementById('sumTotalNet').textContent = fmt(totalNet);
   }
 
