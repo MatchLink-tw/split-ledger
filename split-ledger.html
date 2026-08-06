@@ -548,6 +548,7 @@
   const fmt = n => '$' + Math.round(n).toLocaleString('zh-Hant-TW');
   const toMYR = ex => ex.currency==='USDT' ? ex.amount * usdtRate : ex.amount;
   const fmtOriginal = ex => (ex.currency==='USDT'? 'USDT ' : '$') + ex.amount.toLocaleString('zh-Hant-TW');
+  const byDateAsc = (a,b) => (a.date||'9999-99-99').localeCompare(b.date||'9999-99-99');
 
   // ---------- Firebase 設定 ----------
   // 請把下面這 6 個值換成你自己 Firebase 專案的設定
@@ -912,7 +913,8 @@
     const empty = document.getElementById('expEmpty');
     body.innerHTML='';
     empty.style.display = expenses.length? 'none':'block';
-    expenses.forEach(ex=>{
+    const sorted = [...expenses].sort(byDateAsc);
+    sorted.forEach(ex=>{
       const names = ex.participantIds.map(id=>{
         const emp = employees.find(e=>e.id===id);
         return emp? `<span class="tag">${escapeHtml(emp.name)}</span>` : '';
@@ -940,7 +942,8 @@
     const empty = document.getElementById('devEmpty');
     body.innerHTML='';
     empty.style.display = devExpenses.length? 'none':'block';
-    devExpenses.forEach(ex=>{
+    const sorted = [...devExpenses].sort(byDateAsc);
+    sorted.forEach(ex=>{
       const names = ex.participantIds.map(id=>{
         const emp = employees.find(e=>e.id===id);
         return emp? `<span class="tag">${escapeHtml(emp.name)}</span>` : '';
@@ -969,7 +972,8 @@
     body.innerHTML='';
     empty.style.display = pettyCash.length? 'none':'block';
     let total = 0;
-    pettyCash.forEach(c=>{
+    const sorted = [...pettyCash].sort(byDateAsc);
+    sorted.forEach(c=>{
       const names = (c.participantIds||[]).map(id=>{
         const emp = employees.find(e=>e.id===id);
         return emp? `<span class="tag">${escapeHtml(emp.name)}</span>` : '';
