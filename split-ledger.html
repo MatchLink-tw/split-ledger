@@ -283,7 +283,7 @@
   <div class="inner">
     <div class="eyebrow">內部工具 · 費用結算</div>
     <h1>分帳 &amp; 備用金結算</h1>
-    <p>只有實際「有使用」該筆費用的員工才會被分攤。股東入帳為公司資金來源，與員工分攤無關。</p>
+    <p>只有實際「有使用」該筆費用的員工才會被分攤。備用金為公司資金來源，同樣視為開銷並分攤給受惠員工。</p>
     <div id="syncStatus" style="margin-top:12px;font-family:var(--mono);font-size:11.5px;color:#9AA6C4;">連線中…</div>
   </div>
 </header>
@@ -293,7 +293,7 @@
     <button class="tab-btn active" data-tab="emp">員工</button>
     <button class="tab-btn" data-tab="exp">費用登記</button>
     <button class="tab-btn" data-tab="dev">開發</button>
-    <button class="tab-btn" data-tab="cash">股東入帳</button>
+    <button class="tab-btn" data-tab="cash">備用金</button>
     <button class="tab-btn" data-tab="sum">結算總表</button>
     <button class="refresh-btn" id="refreshBtn" title="從雲端重新讀取最新資料">↻ 重新整理</button>
   </div>
@@ -431,18 +431,18 @@
     </div>
   </section>
 
-  <!-- 股東入帳 -->
+  <!-- 備用金 -->
   <section id="cash">
-    <h2 class="section-title">股東入帳</h2>
-    <p class="section-sub">股東出資給公司的資金，同樣視為一筆開銷，勾選「有使用/受惠到」的員工，系統會自動平均分攤給這些人並算入結算總表。</p>
+    <h2 class="section-title">備用金</h2>
+    <p class="section-sub">備用金支出，同樣視為一筆開銷，勾選「有使用/受惠到」的員工，系統會自動平均分攤給這些人並算入結算總表。</p>
     <div class="card">
       <div class="form-row">
         <div class="field" style="flex:1.4;">
-          <label for="cashName">股東姓名 / 項目</label>
+          <label for="cashName">備用金項目</label>
           <input id="cashName" type="text" placeholder="例如：王大股 - 增資">
         </div>
         <div class="field">
-          <label for="cashAmount">金額</label>
+          <label for="cashAmount">總金額（自動加總下方明細，也可直接手動填）</label>
           <input id="cashAmount" type="number" min="0" step="1" placeholder="0">
         </div>
         <div class="field">
@@ -461,12 +461,19 @@
           <input id="cashNote" type="text" placeholder="例如：增資、週轉金">
         </div>
       </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <label style="font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-soft);">明細拆項（選填，可拆成兩筆以上不同用途）</label>
+        <button type="button" id="cashAddItemBtn" style="border:none;background:none;color:var(--accent, #2c6e6f);font-size:12px;font-weight:600;cursor:pointer;text-decoration:underline;padding:0;">+ 新增一筆明細</button>
+      </div>
+      <div id="cashItemsWrap" style="margin-bottom:16px;"></div>
+
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
         <label style="font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-soft);">誰有使用/受惠（勾選）</label>
         <button type="button" id="cashSelectAllBtn" style="border:none;background:none;color:var(--accent, #2c6e6f);font-size:12px;font-weight:600;cursor:pointer;text-decoration:underline;padding:0;">全選 / 取消全選</button>
       </div>
       <div class="participants" id="cashParticipants"></div>
-      <button class="primary" id="addCashBtn">新增入帳紀錄</button>
+      <button class="primary" id="addCashBtn">新增備用金紀錄</button>
       <button type="button" id="cancelCashEditBtn" style="display:none;margin-left:8px;border:1px solid var(--line,#ccc);background:none;padding:9px 16px;border-radius:6px;cursor:pointer;">取消編輯</button>
     </div>
 
@@ -474,7 +481,7 @@
       <table>
         <thead>
           <tr>
-            <th>股東姓名 / 項目</th><th>日期</th><th>備註</th><th>參與者</th>
+            <th>備用金項目</th><th>日期</th><th>明細/備註</th><th>參與者</th>
             <th class="num">原幣金額</th><th class="num">折合馬幣</th><th class="num">每人分攤（馬幣）</th><th></th><th></th>
           </tr>
         </thead>
@@ -487,14 +494,14 @@
           </tr>
         </tfoot>
       </table>
-      <div id="cashEmpty" class="empty">尚未登記任何股東入帳</div>
+      <div id="cashEmpty" class="empty">尚未登記任何備用金</div>
     </div>
   </section>
 
   <!-- 結算總表 -->
   <section id="sum">
     <h2 class="section-title">結算總表</h2>
-    <p class="section-sub">每人開銷 = 費用分攤 + 開發分攤 + 股東入帳分攤（皆已換算為馬幣），單純記錄每位員工名下的開銷總額。</p>
+    <p class="section-sub">每人開銷 = 費用分攤 + 開發分攤 + 備用金分攤（皆已換算為馬幣），單純記錄每位員工名下的開銷總額。</p>
     <div class="card">
       <table class="ledger">
         <thead>
@@ -502,7 +509,7 @@
             <th>員工</th>
             <th class="num">費用分攤</th>
             <th class="num">開發分攤</th>
-            <th class="num">股東入帳分攤</th>
+            <th class="num">備用金分攤</th>
             <th class="num">每人開銷</th>
           </tr>
         </thead>
@@ -539,7 +546,7 @@
   let employees = [];   // {id, name}
   let expenses = [];    // {id, name, amount, currency:'MYR'|'USDT', date, participantIds:[]}
   let devExpenses = []; // 開發費用，結構同 expenses
-  let pettyCash = [];   // 股東入帳，結構同 expenses：{id, name, amount, currency, date, participantIds}
+  let pettyCash = [];   // 備用金，結構同 expenses：{id, name, amount, currency, date, participantIds}
   let nextId = 1;
   let usdtRate = 4.70;   // 1 USDT = ? MYR
   let editingExpenseId = null;
@@ -791,7 +798,7 @@
     saveData();
   }
 
-  // ---------- 股東入帳 ----------
+  // ---------- 備用金 ----------
   document.getElementById('addCashBtn').addEventListener('click', addCash);
   document.getElementById('cashSelectAllBtn').addEventListener('click', ()=>{
     const boxes = Array.from(document.querySelectorAll('#cashParticipants input[type=checkbox]'));
@@ -808,7 +815,7 @@
     const date = document.getElementById('cashDate').value;
     const note = document.getElementById('cashNote').value.trim();
     const checked = Array.from(document.querySelectorAll('#cashParticipants input:checked')).map(i=>parseInt(i.value));
-    if(!name){ alert('請輸入股東姓名 / 項目'); return; }
+    if(!name){ alert('請輸入備用金項目'); return; }
     if(!amount || amount<=0){ alert('請輸入金額'); return; }
     if(checked.length===0){ alert('請至少勾選一位有使用/受惠的員工'); return; }
     if(editingCashId!==null){
@@ -842,14 +849,14 @@
         cb.closest('.chip').classList.add('checked');
       }
     });
-    document.getElementById('addCashBtn').textContent = '更新入帳紀錄';
+    document.getElementById('addCashBtn').textContent = '更新備用金紀錄';
     document.getElementById('cancelCashEditBtn').style.display = 'inline-block';
     document.getElementById('cashName').scrollIntoView({behavior:'smooth', block:'center'});
   }
 
   function cancelCashEdit(){
     editingCashId = null;
-    document.getElementById('addCashBtn').textContent = '新增入帳紀錄';
+    document.getElementById('addCashBtn').textContent = '新增備用金紀錄';
     document.getElementById('cancelCashEditBtn').style.display = 'none';
     document.getElementById('cashName').value='';
     document.getElementById('cashAmount').value='';
