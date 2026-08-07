@@ -442,7 +442,7 @@
           <input id="cashName" type="text" placeholder="例如：王大股 - 增資">
         </div>
         <div class="field">
-          <label for="cashAmount">總金額（自動加總下方明細，也可直接手動填）</label>
+          <label for="cashAmount">總金額（若填明細會自動加總鎖定，未填明細可手動輸入）</label>
           <input id="cashAmount" type="number" min="0" step="1" placeholder="0">
         </div>
         <div class="field">
@@ -808,27 +808,77 @@
   });
   let editingCashId = null;
 
+  function addCashItemRow(desc, amount){
+    const wrap = document.getElementById('cashItemsWrap');
+    const row = document.createElement('div');
+    row.className = 'cash-item-row';
+    row.style.cssText = 'display:flex;gap:8px;margin-bottom:6px;align-items:center;';
+    row.innerHTML = `
+      <input type="text" class="cash-item-desc" placeholder="明細說明，例如：交通費" style="flex:2;padding:8px 10px;border:1px solid var(--line,#ccc);border-radius:6px;">
+      <input type="number" class="cash-item-amount" min="0" step="1" placeholder="金額" style="flex:1;padding:8px 10px;border:1px solid var(--line,#ccc);border-radius:6px;">
+      <button type="button" class="cash-item-remove" style="border:none;background:none;color:#B5472A;cursor:pointer;font-size:12px;font-weight:600;">移除</button>`;
+    row.querySelector('.cash-item-desc').value = desc || '';
+    row.querySelector('.cash-item-amount').value = (amount!==undefined && amount!==null) ? amount : '';
+    row.querySelector('.cash-item-amount').addEventListener('input', updateCashItemsTotalHint);
+    row.querySelector('.cash-item-remove').addEventListener('click', ()=>{ row.remove(); updateCashItemsTotalHint(); });
+    wrap.appendChild(row);
+    updateCashItemsTotalHint();
+  }
+
+  function clearCashItemRows(){
+    document.getElementById('cashItemsWrap').innerHTML = '';
+    updateCashItemsTotalHint();
+  }
+
+  function collectCashItems(){
+    return Array.from(document.querySelectorAll('#cashItemsWrap .cash-item-row')).map(row=>{
+      const desc = row.querySelector('.cash-item-desc').value.trim();
+      const amount = parseFloat(row.querySelector('.cash-item-amount').value);
+      return {desc, amount};
+    }).filter(it=> it.desc && it.amount>0);
+  }
+
+  function updateCashItemsTotalHint(){
+    const items = collectCashItems();
+    const amountInput = document.getElementById('cashAmount');
+    if(items.length>0){
+      const sum = items.reduce((s,it)=>s+it.amount, 0);
+      amountInput.value = sum;
+      amountInput.readOnly = true;
+      amountInput.style.background = 'var(--paper-soft, #f2efe6)';
+    } else {
+      amountInput.readOnly = false;
+      amountInput.style.background = '';
+    }
+  }
+
+  document.getElementById('cashAddItemBtn').addEventListener('click', ()=> addCashItemRow('', ''));
+
   function addCash(){
     const name = document.getElementById('cashName').value.trim();
-    const amount = parseFloat(document.getElementById('cashAmount').value);
+    const items = collectCashItems();
+    const amount = items.length>0 ? items.reduce((s,it)=>s+it.amount,0) : parseFloat(document.getElementById('cashAmount').value);
     const currency = document.getElementById('cashCurrency').value;
     const date = document.getElementById('cashDate').value;
     const note = document.getElementById('cashNote').value.trim();
     const checked = Array.from(document.querySelectorAll('#cashParticipants input:checked')).map(i=>parseInt(i.value));
     if(!name){ alert('請輸入備用金項目'); return; }
-    if(!amount || amount<=0){ alert('請輸入金額'); return; }
+    if(!amount || amount<=0){ alert('請輸入金額，或至少新增一筆有效的明細'); return; }
     if(checked.length===0){ alert('請至少勾選一位有使用/受惠的員工'); return; }
     if(editingCashId!==null){
       const idx = pettyCash.findIndex(c=>c.id===editingCashId);
-      if(idx>-1) pettyCash[idx] = {id: editingCashId, name, amount, currency, date, note, participantIds: checked};
+      if(idx>-1) pettyCash[idx] = {id: editingCashId, name, amount, currency, date, note, items, participantIds: checked};
       cancelCashEdit();
     } else {
-      pettyCash.push({id: nextId++, name, amount, currency, date, note, participantIds: checked});
+      pettyCash.push({id: nextId++, name, amount, currency, date, note, items, participantIds: checked});
     }
     document.getElementById('cashName').value='';
     document.getElementById('cashAmount').value='';
+    document.getElementById('cashAmount').readOnly = false;
+    document.getElementById('cashAmount').style.background = '';
     document.getElementById('cashDate').value='';
     document.getElementById('cashNote').value='';
+    clearCashItemRows();
     renderAll();
     saveData();
   }
@@ -842,6 +892,8 @@
     document.getElementById('cashCurrency').value = c.currency || 'MYR';
     document.getElementById('cashDate').value = c.date || '';
     document.getElementById('cashNote').value = c.note || '';
+    clearCashItemRows();
+    (c.items||[]).forEach(it=> addCashItemRow(it.desc, it.amount));
     renderParticipantChips('cashParticipants');
     document.querySelectorAll('#cashParticipants input[type=checkbox]').forEach(cb=>{
       if((c.participantIds||[]).includes(parseInt(cb.value))){
@@ -860,8 +912,11 @@
     document.getElementById('cancelCashEditBtn').style.display = 'none';
     document.getElementById('cashName').value='';
     document.getElementById('cashAmount').value='';
+    document.getElementById('cashAmount').readOnly = false;
+    document.getElementById('cashAmount').style.background = '';
     document.getElementById('cashDate').value='';
     document.getElementById('cashNote').value='';
+    clearCashItemRows();
     renderParticipantChips('cashParticipants');
   }
   document.getElementById('cancelCashEditBtn').addEventListener('click', cancelCashEdit);
@@ -988,11 +1043,18 @@
       const myrAmount = toMYR(c);
       const per = (c.participantIds && c.participantIds.length)? myrAmount/c.participantIds.length : 0;
       total += myrAmount;
+      const currencySymbol = c.currency==='USDT' ? 'USDT ' : '$';
+      let detailHtml;
+      if(c.items && c.items.length>0){
+        detailHtml = c.items.map(it=> `${escapeHtml(it.desc)}：${currencySymbol}${Math.round(it.amount).toLocaleString('zh-Hant-TW')}`).join('<br>');
+      } else {
+        detailHtml = escapeHtml(c.note||'—');
+      }
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${escapeHtml(c.name||'—')}</td>
         <td>${c.date||'—'}</td>
-        <td>${escapeHtml(c.note||'—')}</td>
+        <td>${detailHtml}</td>
         <td>${names||'—'}</td>
         <td class="num">${fmtOriginal(c)}</td>
         <td class="num">${fmt(myrAmount)}</td>
