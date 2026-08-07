@@ -291,6 +291,8 @@
 <nav class="tabs">
   <div class="inner">
     <button class="tab-btn active" data-tab="emp">員工</button>
+    <button class="tab-btn" data-tab="agent">代理</button>
+    <button class="tab-btn" data-tab="deposit">入金</button>
     <button class="tab-btn" data-tab="exp">費用登記</button>
     <button class="tab-btn" data-tab="dev">開發</button>
     <button class="tab-btn" data-tab="cash">備用金</button>
@@ -304,20 +306,94 @@
   <!-- 員工 -->
   <section id="emp" class="active">
     <h2 class="section-title">員工名單</h2>
-    <p class="section-sub">先建立員工，才能在費用登記時勾選誰有使用。</p>
+    <p class="section-sub">先建立員工，才能在費用登記時勾選誰有使用。可指定「所屬代理」，用於代理淨利潤結算。</p>
     <div class="card">
       <div class="form-row">
         <div class="field" style="flex:2;">
           <label for="empName">姓名</label>
           <input id="empName" type="text" placeholder="例如：王小明">
         </div>
+        <div class="field" style="flex:1.4;">
+          <label for="empAgent">所屬代理（選填）</label>
+          <select id="empAgent"><option value="">— 無 —</option></select>
+        </div>
         <button class="primary" id="addEmpBtn">新增員工</button>
       </div>
       <table>
-        <thead><tr><th>姓名</th><th></th></tr></thead>
+        <thead><tr><th>姓名</th><th>所屬代理</th><th></th><th></th></tr></thead>
         <tbody id="empTableBody"></tbody>
       </table>
       <div id="empEmpty" class="empty">尚未新增任何員工</div>
+    </div>
+  </section>
+
+  <!-- 代理 -->
+  <section id="agent">
+    <h2 class="section-title">代理名單</h2>
+    <p class="section-sub">代理是員工的上層，代理淨利潤 = 所屬員工的入金總額 − 所屬員工的開銷總額（費用＋開發＋備用金）。</p>
+    <div class="card">
+      <div class="form-row">
+        <div class="field" style="flex:2;">
+          <label for="agentName">代理姓名</label>
+          <input id="agentName" type="text" placeholder="例如：陳代理">
+        </div>
+        <button class="primary" id="addAgentBtn">新增代理</button>
+      </div>
+      <table>
+        <thead><tr><th>代理姓名</th><th>所屬員工人數</th><th></th></tr></thead>
+        <tbody id="agentTableBody"></tbody>
+      </table>
+      <div id="agentEmpty" class="empty">尚未新增任何代理</div>
+    </div>
+  </section>
+
+  <!-- 入金 -->
+  <section id="deposit">
+    <h2 class="section-title">人員入金</h2>
+    <p class="section-sub">記錄哪位員工入金多少錢，用於計算該員工所屬代理的淨利潤（入金 − 開銷）。</p>
+    <div class="card">
+      <div class="form-row">
+        <div class="field" style="flex:1.2;">
+          <label for="depEmp">員工</label>
+          <select id="depEmp"></select>
+        </div>
+        <div class="field">
+          <label for="depAmount">金額</label>
+          <input id="depAmount" type="number" min="0" step="1" placeholder="0">
+        </div>
+        <div class="field">
+          <label for="depCurrency">幣別</label>
+          <select id="depCurrency">
+            <option value="MYR">馬幣（MYR）</option>
+            <option value="USDT">USDT</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="depDate">日期</label>
+          <input id="depDate" type="date">
+        </div>
+        <div class="field" style="flex:1.4;">
+          <label for="depNote">備註（選填）</label>
+          <input id="depNote" type="text" placeholder="例如：客戶A入金">
+        </div>
+      </div>
+      <button class="primary" id="addDepBtn">新增入金紀錄</button>
+      <button type="button" id="cancelDepEditBtn" style="display:none;margin-left:8px;border:1px solid var(--line,#ccc);background:none;padding:9px 16px;border-radius:6px;cursor:pointer;">取消編輯</button>
+    </div>
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>員工</th><th>日期</th><th>備註</th>
+            <th class="num">原幣金額</th><th class="num">折合馬幣</th><th></th><th></th>
+          </tr>
+        </thead>
+        <tbody id="depTableBody"></tbody>
+        <tfoot>
+          <tr><td colspan="4">合計</td><td class="num" id="depTotal">$0</td><td></td><td></td></tr>
+        </tfoot>
+      </table>
+      <div id="depEmpty" class="empty">尚未登記任何入金</div>
     </div>
   </section>
 
@@ -357,6 +433,14 @@
           <label for="expDate">日期</label>
           <input id="expDate" type="date">
         </div>
+        <div class="field">
+          <label for="expCategory">分類</label>
+          <select id="expCategory">
+            <option value="general">一般開銷</option>
+            <option value="advance">借支</option>
+            <option value="salary">薪資</option>
+          </select>
+        </div>
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
         <label style="font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-soft);">誰有使用（勾選）</label>
@@ -371,7 +455,7 @@
       <table>
         <thead>
           <tr>
-            <th>項目</th><th>日期</th><th>參與者</th>
+            <th>項目</th><th>日期</th><th>分類</th><th>參與者</th>
             <th class="num">原幣金額</th><th class="num">折合馬幣</th><th class="num">每人分攤（馬幣）</th><th></th><th></th>
           </tr>
         </thead>
@@ -501,26 +585,32 @@
   <!-- 結算總表 -->
   <section id="sum">
     <h2 class="section-title">結算總表</h2>
-    <p class="section-sub">每人開銷 = 費用分攤 + 開發分攤 + 備用金分攤（皆已換算為馬幣），單純記錄每位員工名下的開銷總額。</p>
+    <p class="section-sub">每人開銷 = 一般開銷＋借支＋薪資＋開發分攤＋備用金分攤（皆已換算為馬幣）。入金為該員工實際收到的款項，用於下方代理淨利潤計算。</p>
     <div class="card">
       <table class="ledger">
         <thead>
           <tr>
             <th>員工</th>
-            <th class="num">費用分攤</th>
+            <th class="num">一般開銷</th>
+            <th class="num">借支</th>
+            <th class="num">薪資</th>
             <th class="num">開發分攤</th>
             <th class="num">備用金分攤</th>
             <th class="num">每人開銷</th>
+            <th class="num">入金</th>
           </tr>
         </thead>
         <tbody id="sumTableBody"></tbody>
         <tfoot>
           <tr>
             <td>合計</td>
-            <td class="num" id="sumTotalExp">$0</td>
+            <td class="num" id="sumTotalGeneral">$0</td>
+            <td class="num" id="sumTotalAdvance">$0</td>
+            <td class="num" id="sumTotalSalary">$0</td>
             <td class="num" id="sumTotalDev">$0</td>
             <td class="num" id="sumTotalCash">$0</td>
             <td class="num" id="sumTotalNet">$0</td>
+            <td class="num" id="sumTotalDeposit">$0</td>
           </tr>
         </tfoot>
       </table>
@@ -528,7 +618,24 @@
     </div>
 
     <div class="card">
-      <h3 style="margin:0 0 12px;font-size:14px;color:var(--ink-soft);">原幣統計（換算前，三個頁籤加總）</h3>
+      <h3 style="margin:0 0 12px;font-size:14px;color:var(--ink-soft);">代理淨利潤</h3>
+      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 12px;">淨利潤 = 所屬員工入金總額 − 所屬員工每人開銷總額（皆已換算為馬幣）。</p>
+      <table class="ledger">
+        <thead>
+          <tr>
+            <th>代理</th>
+            <th class="num">所屬員工入金</th>
+            <th class="num">所屬員工開銷</th>
+            <th class="num">淨利潤</th>
+          </tr>
+        </thead>
+        <tbody id="agentSumTableBody"></tbody>
+      </table>
+      <div id="agentSumEmpty" class="empty">尚未有代理資料</div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0 0 12px;font-size:14px;color:var(--ink-soft);">原幣統計（換算前，四個頁籤加總）</h3>
       <table class="ledger">
         <thead><tr><th>幣別</th><th class="num">原幣總額</th></tr></thead>
         <tbody>
@@ -543,14 +650,19 @@
 
 <script>
 (function(){
-  let employees = [];   // {id, name}
-  let expenses = [];    // {id, name, amount, currency:'MYR'|'USDT', date, participantIds:[]}
+  let employees = [];   // {id, name, agentId}
+  let agents = [];      // {id, name}
+  let deposits = [];    // {id, empId, amount, currency, date, note}
+  let expenses = [];    // {id, name, amount, currency:'MYR'|'USDT', date, category:'general'|'advance'|'salary', participantIds:[]}
   let devExpenses = []; // 開發費用，結構同 expenses
   let pettyCash = [];   // 備用金，結構同 expenses：{id, name, amount, currency, date, participantIds}
   let nextId = 1;
   let usdtRate = 4.70;   // 1 USDT = ? MYR
   let editingExpenseId = null;
   let editingDevId = null;
+  let editingDepositId = null;
+
+  const CATEGORY_LABEL = {general:'一般開銷', advance:'借支', salary:'薪資'};
 
   const fmt = n => '$' + Math.round(n).toLocaleString('zh-Hant-TW');
   const toMYR = ex => ex.currency==='USDT' ? ex.amount * usdtRate : ex.amount;
@@ -589,7 +701,7 @@
   async function saveData(){
     setSyncStatus('儲存中…');
     try{
-      await docRef.set({employees, expenses, devExpenses, pettyCash, nextId, usdtRate});
+      await docRef.set({employees, agents, deposits, expenses, devExpenses, pettyCash, nextId, usdtRate});
       setSyncStatus('已同步 · ' + new Date().toLocaleTimeString('zh-Hant-TW'));
     }catch(e){
       console.error(e);
@@ -602,6 +714,8 @@
     if(snap.exists){
       const d = snap.data();
       employees = d.employees || [];
+      agents = d.agents || [];
+      deposits = d.deposits || [];
       expenses = d.expenses || [];
       devExpenses = d.devExpenses || [];
       pettyCash = d.pettyCash || [];
@@ -639,8 +753,10 @@
   function addEmployee(){
     const name = empNameInput.value.trim();
     if(!name) return;
-    employees.push({id: nextId++, name});
+    const agentId = document.getElementById('empAgent').value ? parseInt(document.getElementById('empAgent').value) : null;
+    employees.push({id: nextId++, name, agentId});
     empNameInput.value='';
+    document.getElementById('empAgent').value='';
     renderAll();
     saveData();
   }
@@ -650,6 +766,92 @@
     expenses.forEach(e=> e.participantIds = e.participantIds.filter(pid=>pid!==id));
     devExpenses.forEach(e=> e.participantIds = e.participantIds.filter(pid=>pid!==id));
     pettyCash.forEach(e=> { if(e.participantIds) e.participantIds = e.participantIds.filter(pid=>pid!==id); });
+    deposits = deposits.filter(d=>d.empId!==id);
+    renderAll();
+    saveData();
+  }
+
+  function setEmployeeAgent(empId, agentIdRaw){
+    const emp = employees.find(e=>e.id===empId);
+    if(!emp) return;
+    emp.agentId = agentIdRaw ? parseInt(agentIdRaw) : null;
+    renderAll();
+    saveData();
+  }
+
+  // ---------- 代理 ----------
+  const agentNameInput = document.getElementById('agentName');
+  document.getElementById('addAgentBtn').addEventListener('click', addAgent);
+  agentNameInput.addEventListener('keydown', e=>{ if(e.key==='Enter') addAgent(); });
+
+  function addAgent(){
+    const name = agentNameInput.value.trim();
+    if(!name) return;
+    agents.push({id: nextId++, name});
+    agentNameInput.value='';
+    renderAll();
+    saveData();
+  }
+
+  function removeAgent(id){
+    agents = agents.filter(a=>a.id!==id);
+    employees.forEach(e=>{ if(e.agentId===id) e.agentId = null; });
+    renderAll();
+    saveData();
+  }
+
+  // ---------- 入金 ----------
+  document.getElementById('addDepBtn').addEventListener('click', addDeposit);
+  document.getElementById('cancelDepEditBtn').addEventListener('click', cancelDepositEdit);
+
+  function addDeposit(){
+    const empId = document.getElementById('depEmp').value ? parseInt(document.getElementById('depEmp').value) : null;
+    const amount = parseFloat(document.getElementById('depAmount').value);
+    const currency = document.getElementById('depCurrency').value;
+    const date = document.getElementById('depDate').value;
+    const note = document.getElementById('depNote').value.trim();
+    if(!empId){ alert('請選擇員工'); return; }
+    if(!amount || amount<=0){ alert('請輸入金額'); return; }
+    if(editingDepositId!==null){
+      const idx = deposits.findIndex(d=>d.id===editingDepositId);
+      if(idx>-1) deposits[idx] = {id: editingDepositId, empId, amount, currency, date, note};
+      cancelDepositEdit();
+    } else {
+      deposits.push({id: nextId++, empId, amount, currency, date, note});
+    }
+    document.getElementById('depAmount').value='';
+    document.getElementById('depDate').value='';
+    document.getElementById('depNote').value='';
+    renderAll();
+    saveData();
+  }
+
+  function startEditDeposit(id){
+    const d = deposits.find(d=>d.id===id);
+    if(!d) return;
+    editingDepositId = id;
+    document.getElementById('depEmp').value = d.empId;
+    document.getElementById('depAmount').value = d.amount;
+    document.getElementById('depCurrency').value = d.currency || 'MYR';
+    document.getElementById('depDate').value = d.date || '';
+    document.getElementById('depNote').value = d.note || '';
+    document.getElementById('addDepBtn').textContent = '更新入金紀錄';
+    document.getElementById('cancelDepEditBtn').style.display = 'inline-block';
+    document.getElementById('depEmp').scrollIntoView({behavior:'smooth', block:'center'});
+  }
+
+  function cancelDepositEdit(){
+    editingDepositId = null;
+    document.getElementById('addDepBtn').textContent = '新增入金紀錄';
+    document.getElementById('cancelDepEditBtn').style.display = 'none';
+    document.getElementById('depAmount').value='';
+    document.getElementById('depDate').value='';
+    document.getElementById('depNote').value='';
+  }
+
+  function removeDeposit(id){
+    deposits = deposits.filter(d=>d.id!==id);
+    if(editingDepositId===id) cancelDepositEdit();
     renderAll();
     saveData();
   }
@@ -674,19 +876,21 @@
     const amount = parseFloat(document.getElementById('expAmount').value);
     const currency = document.getElementById('expCurrency').value;
     const date = document.getElementById('expDate').value;
+    const category = document.getElementById('expCategory').value;
     const checked = Array.from(document.querySelectorAll('#expParticipants input:checked')).map(i=>parseInt(i.value));
     if(!name || !amount || amount<=0){ alert('請輸入項目名稱與金額'); return; }
     if(checked.length===0){ alert('請至少勾選一位有使用的員工'); return; }
     if(editingExpenseId!==null){
       const idx = expenses.findIndex(e=>e.id===editingExpenseId);
-      if(idx>-1) expenses[idx] = {id: editingExpenseId, name, amount, currency, date, participantIds: checked};
+      if(idx>-1) expenses[idx] = {id: editingExpenseId, name, amount, currency, date, category, participantIds: checked};
       cancelExpEdit();
     } else {
-      expenses.push({id: nextId++, name, amount, currency, date, participantIds: checked});
+      expenses.push({id: nextId++, name, amount, currency, date, category, participantIds: checked});
     }
     document.getElementById('expName').value='';
     document.getElementById('expAmount').value='';
     document.getElementById('expDate').value='';
+    document.getElementById('expCategory').value='general';
     renderAll();
     saveData();
   }
@@ -699,6 +903,7 @@
     document.getElementById('expAmount').value = ex.amount;
     document.getElementById('expCurrency').value = ex.currency || 'MYR';
     document.getElementById('expDate').value = ex.date || '';
+    document.getElementById('expCategory').value = ex.category || 'general';
     renderParticipantChips('expParticipants');
     document.querySelectorAll('#expParticipants input[type=checkbox]').forEach(cb=>{
       if(ex.participantIds.includes(parseInt(cb.value))){
@@ -718,6 +923,7 @@
     document.getElementById('expName').value='';
     document.getElementById('expAmount').value='';
     document.getElementById('expDate').value='';
+    document.getElementById('expCategory').value='general';
     renderParticipantChips('expParticipants');
   }
   document.getElementById('cancelExpEditBtn').addEventListener('click', cancelExpEdit);
@@ -930,7 +1136,11 @@
 
   // ---------- Render ----------
   function renderAll(){
+    renderAgentSelects();
+    renderAgents();
     renderEmployees();
+    renderDepositEmpSelect();
+    renderDeposits();
     renderParticipantChips('expParticipants');
     renderParticipantChips('devParticipants');
     renderParticipantChips('cashParticipants');
@@ -940,6 +1150,62 @@
     renderSummary();
   }
 
+  function renderAgentSelects(){
+    const formSelect = document.getElementById('empAgent');
+    const currentVal = formSelect.value;
+    formSelect.innerHTML = '<option value="">— 無 —</option>' +
+      agents.map(a=>`<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('');
+    formSelect.value = currentVal;
+  }
+
+  function renderAgents(){
+    const body = document.getElementById('agentTableBody');
+    const empty = document.getElementById('agentEmpty');
+    body.innerHTML='';
+    empty.style.display = agents.length? 'none':'block';
+    agents.forEach(a=>{
+      const count = employees.filter(e=>e.agentId===a.id).length;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${escapeHtml(a.name)}</td><td>${count}</td><td><button class="del" data-id="${a.id}">刪除</button></td>`;
+      tr.querySelector('.del').addEventListener('click', ()=>removeAgent(a.id));
+      body.appendChild(tr);
+    });
+  }
+
+  function renderDepositEmpSelect(){
+    const sel = document.getElementById('depEmp');
+    const currentVal = sel.value;
+    sel.innerHTML = employees.map(e=>`<option value="${e.id}">${escapeHtml(e.name)}</option>`).join('');
+    sel.value = currentVal;
+  }
+
+  function renderDeposits(){
+    const body = document.getElementById('depTableBody');
+    const empty = document.getElementById('depEmpty');
+    body.innerHTML='';
+    empty.style.display = deposits.length? 'none':'block';
+    let total = 0;
+    const sorted = [...deposits].sort(byDateAsc);
+    sorted.forEach(d=>{
+      const emp = employees.find(e=>e.id===d.empId);
+      const myrAmount = toMYR(d);
+      total += myrAmount;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${emp? escapeHtml(emp.name): '（已刪除員工）'}</td>
+        <td>${d.date||'—'}</td>
+        <td>${escapeHtml(d.note||'—')}</td>
+        <td class="num">${fmtOriginal(d)}</td>
+        <td class="num">${fmt(myrAmount)}</td>
+        <td><button class="edit" data-id="${d.id}">編輯</button></td>
+        <td><button class="del" data-id="${d.id}">刪除</button></td>`;
+      tr.querySelector('.edit').addEventListener('click', ()=>startEditDeposit(d.id));
+      tr.querySelector('.del').addEventListener('click', ()=>removeDeposit(d.id));
+      body.appendChild(tr);
+    });
+    document.getElementById('depTotal').textContent = fmt(total);
+  }
+
   function renderEmployees(){
     const body = document.getElementById('empTableBody');
     const empty = document.getElementById('empEmpty');
@@ -947,7 +1213,15 @@
     empty.style.display = employees.length? 'none':'block';
     employees.forEach(e=>{
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${escapeHtml(e.name)}</td><td><button class="del" data-id="${e.id}">刪除</button></td>`;
+      const agentOptions = '<option value="">— 無 —</option>' + agents.map(a=>
+        `<option value="${a.id}" ${e.agentId===a.id?'selected':''}>${escapeHtml(a.name)}</option>`
+      ).join('');
+      tr.innerHTML = `
+        <td>${escapeHtml(e.name)}</td>
+        <td><select class="agent-select">${agentOptions}</select></td>
+        <td></td>
+        <td><button class="del" data-id="${e.id}">刪除</button></td>`;
+      tr.querySelector('.agent-select').addEventListener('change', (ev)=> setEmployeeAgent(e.id, ev.target.value));
       tr.querySelector('.del').addEventListener('click', ()=>removeEmployee(e.id));
       body.appendChild(tr);
     });
@@ -987,6 +1261,7 @@
       tr.innerHTML = `
         <td>${escapeHtml(ex.name)}</td>
         <td>${ex.date||'—'}</td>
+        <td>${CATEGORY_LABEL[ex.category] || '一般開銷'}</td>
         <td>${names||'—'}</td>
         <td class="num">${fmtOriginal(ex)}</td>
         <td class="num">${fmt(myrAmount)}</td>
@@ -1074,13 +1349,19 @@
     body.innerHTML='';
     empty.style.display = employees.length? 'none':'block';
 
-    let totalExp=0, totalDev=0, totalCash=0, totalNet=0;
+    let totalGeneral=0, totalAdvance=0, totalSalary=0, totalDev=0, totalCash=0, totalNet=0, totalDeposit=0;
+    const empNetMap = {};   // empId -> 每人開銷（給下方代理計算用）
+    const empDepositMap = {}; // empId -> 入金總額（馬幣）
 
     employees.forEach(e=>{
-      let expShare = 0;
+      let general=0, advance=0, salary=0;
       expenses.forEach(ex=>{
         if(ex.participantIds.includes(e.id) && ex.participantIds.length>0){
-          expShare += toMYR(ex) / ex.participantIds.length;
+          const share = toMYR(ex) / ex.participantIds.length;
+          const cat = ex.category || 'general';
+          if(cat==='advance') advance += share;
+          else if(cat==='salary') salary += share;
+          else general += share;
         }
       });
       let devShare = 0;
@@ -1095,31 +1376,68 @@
           cashShare += toMYR(ex) / ex.participantIds.length;
         }
       });
-      const net = expShare + devShare + cashShare;
+      const net = general + advance + salary + devShare + cashShare;
 
-      totalExp += expShare;
+      let depositSum = 0;
+      deposits.forEach(d=>{ if(d.empId===e.id) depositSum += toMYR(d); });
+
+      empNetMap[e.id] = net;
+      empDepositMap[e.id] = depositSum;
+
+      totalGeneral += general;
+      totalAdvance += advance;
+      totalSalary += salary;
       totalDev += devShare;
       totalCash += cashShare;
       totalNet += net;
+      totalDeposit += depositSum;
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${escapeHtml(e.name)}</td>
-        <td class="num">${fmt(expShare)}</td>
+        <td class="num">${fmt(general)}</td>
+        <td class="num">${fmt(advance)}</td>
+        <td class="num">${fmt(salary)}</td>
         <td class="num">${fmt(devShare)}</td>
         <td class="num">${fmt(cashShare)}</td>
-        <td class="num">${fmt(net)}</td>`;
+        <td class="num">${fmt(net)}</td>
+        <td class="num">${fmt(depositSum)}</td>`;
       body.appendChild(tr);
     });
 
-    document.getElementById('sumTotalExp').textContent = fmt(totalExp);
+    document.getElementById('sumTotalGeneral').textContent = fmt(totalGeneral);
+    document.getElementById('sumTotalAdvance').textContent = fmt(totalAdvance);
+    document.getElementById('sumTotalSalary').textContent = fmt(totalSalary);
     document.getElementById('sumTotalDev').textContent = fmt(totalDev);
     document.getElementById('sumTotalCash').textContent = fmt(totalCash);
     document.getElementById('sumTotalNet').textContent = fmt(totalNet);
+    document.getElementById('sumTotalDeposit').textContent = fmt(totalDeposit);
 
-    // 原幣統計（換算前，三個頁籤加總）
+    // 代理淨利潤 = 所屬員工入金總額 − 所屬員工每人開銷總額
+    const agentBody = document.getElementById('agentSumTableBody');
+    const agentEmpty = document.getElementById('agentSumEmpty');
+    agentBody.innerHTML = '';
+    agentEmpty.style.display = agents.length? 'none':'block';
+    agents.forEach(a=>{
+      const myEmployees = employees.filter(e=>e.agentId===a.id);
+      let deposit=0, cost=0;
+      myEmployees.forEach(e=>{
+        deposit += empDepositMap[e.id] || 0;
+        cost += empNetMap[e.id] || 0;
+      });
+      const profit = deposit - cost;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${escapeHtml(a.name)}</td>
+        <td class="num">${fmt(deposit)}</td>
+        <td class="num">${fmt(cost)}</td>
+        <td class="num">${fmt(profit)}</td>`;
+      agentBody.appendChild(tr);
+    });
+
+    // 原幣統計（換算前，四個頁籤加總）
     let rawMYR = 0, rawUSDT = 0;
-    [...expenses, ...devExpenses, ...pettyCash].forEach(ex=>{
+    [...expenses, ...devExpenses, ...pettyCash, ...deposits].forEach(ex=>{
       if(ex.currency==='USDT') rawUSDT += ex.amount;
       else rawMYR += ex.amount;
     });
