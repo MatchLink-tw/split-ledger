@@ -624,9 +624,12 @@
         <thead>
           <tr>
             <th>代理</th>
-            <th class="num">所屬員工入金</th>
-            <th class="num">所屬員工開銷</th>
-            <th class="num">淨利潤</th>
+            <th class="num">入金（USDT）</th>
+            <th class="num">入金（馬幣）</th>
+            <th class="num">開銷（USDT）</th>
+            <th class="num">開銷（馬幣）</th>
+            <th class="num">淨利潤（USDT）</th>
+            <th class="num">淨利潤（馬幣）</th>
           </tr>
         </thead>
         <tbody id="agentSumTableBody"></tbody>
@@ -668,6 +671,8 @@
   const toMYR = ex => ex.currency==='USDT' ? ex.amount * usdtRate : ex.amount;
   const fmtOriginal = ex => (ex.currency==='USDT'? 'USDT ' : '$') + ex.amount.toLocaleString('zh-Hant-TW');
   const byDateAsc = (a,b) => (a.date||'9999-99-99').localeCompare(b.date||'9999-99-99');
+  const toUSDT = myrAmount => usdtRate>0 ? myrAmount / usdtRate : 0;
+  const fmtUSDT = n => 'USDT ' + Math.round(n).toLocaleString('zh-Hant-TW');
 
   // ---------- Firebase 設定 ----------
   // 請把下面這 6 個值換成你自己 Firebase 專案的設定
@@ -1429,8 +1434,11 @@
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${escapeHtml(a.name)}</td>
+        <td class="num">${fmtUSDT(toUSDT(deposit))}</td>
         <td class="num">${fmt(deposit)}</td>
+        <td class="num">${fmtUSDT(toUSDT(cost))}</td>
         <td class="num">${fmt(cost)}</td>
+        <td class="num">${fmtUSDT(toUSDT(profit))}</td>
         <td class="num">${fmt(profit)}</td>`;
       agentBody.appendChild(tr);
     });
